@@ -89,10 +89,10 @@ const Login = () => {
       <div
         style={{
           backgroundColor: '#ffffff',
-          padding: '48px',
+          padding: '64px',
           borderRadius: '8px',
           boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.2), 0 4px 5px 0 rgba(0, 0, 0, 0.14), 0 1px 10px 0 rgba(0, 0, 0, 0.12)',
-          maxWidth: '400px',
+          maxWidth: '600px',
           width: '100%',
           textAlign: 'center'
         }}
@@ -100,9 +100,9 @@ const Login = () => {
         <h1
           style={{
             color: 'rgba(0, 0, 0, 0.87)',
-            fontSize: '28px',
+            fontSize: '36px',
             fontWeight: '500',
-            marginBottom: '8px',
+            marginBottom: '12px',
             letterSpacing: '0.15px'
           }}
         >
@@ -111,9 +111,9 @@ const Login = () => {
         <p
           style={{
             color: 'rgba(0, 0, 0, 0.6)',
-            fontSize: '14px',
-            marginBottom: '32px',
-            marginTop: '8px'
+            fontSize: '16px',
+            marginBottom: '48px',
+            marginTop: '12px'
           }}
         >
           Sign in with your Google account to continue
