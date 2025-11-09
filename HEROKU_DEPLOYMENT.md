@@ -80,7 +80,46 @@ heroku config
 4. Click **Allow Access from Anywhere** (or add Heroku's IP ranges)
 5. Save
 
-## Step 6: Deploy to Heroku
+## Step 6: Connect Heroku to GitHub (Automatic Deployments)
+
+To enable automatic deployments from GitHub, connect your Heroku app to your GitHub repository:
+
+### Option A: Via Heroku Dashboard (Recommended)
+
+1. Go to [Heroku Dashboard](https://dashboard.heroku.com/apps)
+2. Select your app (`blooming-citadel-76658` or your app name)
+3. Click on the **Deploy** tab
+4. In the **Deployment method** section, click **Connect to GitHub**
+5. If prompted, authorize Heroku to access your GitHub account
+6. Search for your repository: `DazHaze/Fridge-app` (or your repo name)
+7. Click **Connect** next to your repository
+8. (Optional) Click **Enable Automatic Deploys** to automatically deploy when you push to a specific branch
+   - Select the branch (usually `main` or `master`)
+   - Heroku will automatically deploy whenever you push to that branch
+9. (Optional) Click **Enable Wait for CI to pass** if you have CI/CD checks
+
+### Option B: Via Heroku CLI
+
+```bash
+# First, login to Heroku
+heroku login
+
+# Connect GitHub integration (requires Heroku CLI plugin)
+heroku plugins:install heroku-releases-retry
+
+# Note: GitHub integration is typically easier via the Dashboard
+```
+
+**Benefits of GitHub Integration:**
+- ✅ Automatic deployments on push to main branch
+- ✅ Manual deployments from any branch
+- ✅ View deployment history
+- ✅ Rollback to previous deployments
+- ✅ Wait for CI checks before deploying
+
+## Step 7: Deploy to Heroku
+
+### Manual Deployment (via Git)
 
 ```bash
 # Make sure you're on the main branch
@@ -99,7 +138,17 @@ git push heroku main
 heroku git:remote -a your-app-name
 ```
 
-## Step 7: Verify Deployment
+### Automatic Deployment (via GitHub)
+
+If you've enabled automatic deployments:
+1. Push your changes to GitHub:
+   ```bash
+   git push origin main
+   ```
+2. Heroku will automatically detect the push and deploy
+3. Check deployment status in the Heroku Dashboard under the **Activity** tab
+
+## Step 8: Verify Deployment
 
 ```bash
 # Check if the app is running
@@ -114,7 +163,7 @@ heroku open
 
 Your API will be available at: `https://your-app-name.herokuapp.com/api/fridge-items`
 
-## Step 8: Update Frontend Configuration
+## Step 9: Update Frontend Configuration
 
 Update your frontend to use the Heroku backend URL:
 
