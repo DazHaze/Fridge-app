@@ -5,9 +5,12 @@ import './index.css'
 import App from './App.tsx'
 import { AuthProvider } from './contexts/AuthContext'
 
+// Get base path from import.meta.env or default to '/'
+const basePath = import.meta.env.BASE_URL || '/'
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter>
+    <BrowserRouter basename={basePath}>
       <AuthProvider>
         <App />
       </AuthProvider>
