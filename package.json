@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:frontend": "vite build",
     "build:server": "tsc --project server/tsconfig.json",
     "preview": "vite preview",
     "server": "tsx watch server/index.ts",
