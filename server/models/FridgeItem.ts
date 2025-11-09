@@ -3,6 +3,9 @@ import mongoose, { Schema, Document } from 'mongoose'
 export interface IFridgeItem extends Document {
   name: string
   expiryDate: Date
+  userId: string
+  isOpened: boolean
+  openedDate?: Date
   createdAt: Date
 }
 
@@ -15,6 +18,19 @@ const FridgeItemSchema: Schema = new Schema({
   expiryDate: {
     type: Date,
     required: true
+  },
+  userId: {
+    type: String,
+    required: true,
+    index: true
+  },
+  isOpened: {
+    type: Boolean,
+    default: false
+  },
+  openedDate: {
+    type: Date,
+    default: null
   },
   createdAt: {
     type: Date,

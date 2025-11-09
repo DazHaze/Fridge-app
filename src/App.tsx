@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import './App.css'
 import { getApiUrl } from './config'
@@ -9,33 +9,54 @@ interface FridgeItem {
   _id: string
   name: string
   expiryDate: string
+  isOpened?: boolean
+  openedDate?: string
   createdAt?: string
 }
 
 function FridgeApp() {
   const { user, logout } = useAuth()
+  const userId = user?.sub || ''
   const [isFormOpen, setIsFormOpen] = useState(false)
+  const [isEditFormOpen, setIsEditFormOpen] = useState(false)
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
   const [itemName, setItemName] = useState('')
   const [expiryDate, setExpiryDate] = useState('')
+  const [isOpened, setIsOpened] = useState(false)
   const [items, setItems] = useState<FridgeItem[]>([])
   const [binItems, setBinItems] = useState<FridgeItem[]>([])
   const [loading, setLoading] = useState(true)
   const [deletedCount, setDeletedCount] = useState(0)
 
   // Check if an item is expired
-  const isExpired = (expiryDateString: string): boolean => {
+  const isExpired = (item: FridgeItem): boolean => {
     const today = new Date()
     today.setHours(0, 0, 0, 0) // Reset time to start of day
-    const expiryDate = new Date(expiryDateString)
+    
+    // If item is opened, check if it's been more than 3 days since opened
+    if (item.isOpened && item.openedDate) {
+      const openedDate = new Date(item.openedDate)
+      openedDate.setHours(0, 0, 0, 0)
+      const daysSinceOpened = Math.ceil((today.getTime() - openedDate.getTime()) / (1000 * 60 * 60 * 24))
+      return daysSinceOpened > 3
+    }
+    
+    // Otherwise check expiry date
+    const expiryDate = new Date(item.expiryDate)
     expiryDate.setHours(0, 0, 0, 0)
     return expiryDate < today
   }
 
   // Get priority color based on days until expiry (Material Design colors)
-  const getPriorityColor = (expiryDateString: string): string => {
+  const getPriorityColor = (item: FridgeItem): string => {
+    // Opened items are always red
+    if (item.isOpened) {
+      return '#d32f2f' // Material Design Red
+    }
+    
     const today = new Date()
     today.setHours(0, 0, 0, 0)
-    const expiryDate = new Date(expiryDateString)
+    const expiryDate = new Date(item.expiryDate)
     expiryDate.setHours(0, 0, 0, 0)
     
     // Calculate difference in days
@@ -57,10 +78,30 @@ function FridgeApp() {
   }
 
   // Get priority label text
-  const getPriorityLabel = (expiryDateString: string): string => {
+  const getPriorityLabel = (item: FridgeItem): string => {
+    // For opened items, show days since opened
+    if (item.isOpened && item.openedDate) {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const openedDate = new Date(item.openedDate)
+      openedDate.setHours(0, 0, 0, 0)
+      const daysSinceOpened = Math.ceil((today.getTime() - openedDate.getTime()) / (1000 * 60 * 60 * 24))
+      
+      if (daysSinceOpened === 0) {
+        return 'Opened today'
+      } else if (daysSinceOpened === 1) {
+        return 'Opened yesterday'
+      } else if (daysSinceOpened <= 3) {
+        return `Opened ${daysSinceOpened} days ago`
+      } else {
+        return `Opened ${daysSinceOpened} days ago`
+      }
+    }
+    
+    // For unopened items, show expiry info
     const today = new Date()
     today.setHours(0, 0, 0, 0)
-    const expiryDate = new Date(expiryDateString)
+    const expiryDate = new Date(item.expiryDate)
     expiryDate.setHours(0, 0, 0, 0)
     
     const diffTime = expiryDate.getTime() - today.getTime()
@@ -87,7 +128,7 @@ function FridgeApp() {
     const expired: FridgeItem[] = []
     
     allItems.forEach(item => {
-      if (isExpired(item.expiryDate)) {
+      if (isExpired(item)) {
         expired.push(item)
       } else {
         active.push(item)
@@ -97,14 +138,14 @@ function FridgeApp() {
     return { active, expired }
   }
 
-  // Fetch items from API on component mount
-  useEffect(() => {
-    fetchItems()
-  }, [])
-
-  const fetchItems = async () => {
+  const fetchItems = useCallback(async () => {
+    if (!userId) {
+      setLoading(false)
+      return
+    }
+    
     try {
-      const response = await fetch(getApiUrl('fridge-items'))
+      const response = await fetch(getApiUrl(`fridge-items?userId=${encodeURIComponent(userId)}`))
       if (response.ok) {
         const data = await response.json()
         const { active, expired } = separateItems(data)
@@ -116,7 +157,14 @@ function FridgeApp() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [userId])
+
+  // Fetch items from API on component mount and when userId changes
+  useEffect(() => {
+    if (userId) {
+      fetchItems()
+    }
+  }, [userId, fetchItems])
 
   const handlePlusClick = () => {
     setIsFormOpen(true)
@@ -126,6 +174,77 @@ function FridgeApp() {
     setIsFormOpen(false)
     setItemName('')
     setExpiryDate('')
+  }
+
+  const handleEditClick = (item: FridgeItem) => {
+    setEditingItemId(item._id)
+    setItemName(item.name)
+    setExpiryDate(item.expiryDate.split('T')[0]) // Format date for input
+    setIsOpened(item.isOpened || false)
+    setIsEditFormOpen(true)
+  }
+
+  const handleCloseEditForm = () => {
+    setIsEditFormOpen(false)
+    setEditingItemId(null)
+    setItemName('')
+    setExpiryDate('')
+    setIsOpened(false)
+  }
+
+  const handleUpdateItem = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingItemId) return
+
+    try {
+      const updateData: any = {
+        name: itemName,
+        expiryDate: expiryDate,
+        userId: userId,
+        isOpened: isOpened
+      }
+      
+      // If opening the item, set openedDate to today
+      if (isOpened) {
+        const currentItem = [...items, ...binItems].find(item => item._id === editingItemId)
+        // Only set openedDate if it wasn't already opened
+        if (!currentItem?.isOpened) {
+          updateData.openedDate = new Date().toISOString()
+        } else if (currentItem?.openedDate) {
+          updateData.openedDate = currentItem.openedDate
+        }
+      } else {
+        // If closing, clear openedDate
+        updateData.openedDate = null
+      }
+      
+      const response = await fetch(getApiUrl(`fridge-items/${editingItemId}?userId=${encodeURIComponent(userId)}`), {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData)
+      })
+
+      if (response.ok) {
+        const updatedItem = await response.json()
+        console.log('Item successfully updated:', updatedItem)
+        
+        // Update the item in the appropriate list
+        setItems(items.map(item => item._id === editingItemId ? updatedItem : item))
+        setBinItems(binItems.map(item => item._id === editingItemId ? updatedItem : item))
+        
+        handleCloseEditForm()
+        // Refresh items to ensure correct separation
+        fetchItems()
+      } else {
+        console.error('Error updating item')
+        alert('Failed to update item. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error updating item:', error)
+      alert('Failed to connect to server. Please check your connection.')
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -138,7 +257,8 @@ function FridgeApp() {
         },
         body: JSON.stringify({
           name: itemName,
-          expiryDate: expiryDate
+          expiryDate: expiryDate,
+          userId: userId
         })
       })
 
@@ -147,7 +267,7 @@ function FridgeApp() {
         console.log('Item successfully saved to database:', newItem)
         
         // Check if the new item is expired and add to appropriate list
-        if (isExpired(newItem.expiryDate)) {
+        if (isExpired(newItem)) {
           setBinItems([newItem, ...binItems])
         } else {
           setItems([newItem, ...items])
@@ -178,7 +298,7 @@ function FridgeApp() {
 
   const handleDeleteItem = async (id: string) => {
     try {
-      const response = await fetch(getApiUrl(`fridge-items/${id}`), {
+      const response = await fetch(getApiUrl(`fridge-items/${id}?userId=${encodeURIComponent(userId)}`), {
         method: 'DELETE'
       })
 
@@ -208,7 +328,7 @@ function FridgeApp() {
     }
 
     try {
-      const response = await fetch(getApiUrl('fridge-items'), {
+      const response = await fetch(getApiUrl(`fridge-items?userId=${encodeURIComponent(userId)}`), {
         method: 'DELETE'
       })
 
@@ -372,8 +492,12 @@ function FridgeApp() {
             </p>
           ) : (
             items.map((item) => {
-              const priorityColor = getPriorityColor(item.expiryDate)
-              const priorityLabel = getPriorityLabel(item.expiryDate)
+              const priorityColor = getPriorityColor(item)
+              const priorityLabel = getPriorityLabel(item)
+              const displayDate = item.isOpened && item.openedDate 
+                ? new Date(item.openedDate).toLocaleDateString()
+                : new Date(item.expiryDate).toLocaleDateString()
+              const dateLabel = item.isOpened ? 'Opened' : 'Expires'
               
               return (
               <div
@@ -396,69 +520,107 @@ function FridgeApp() {
                   transition: 'box-shadow 0.2s ease'
                 }}
               >
-                <div style={{ 
-                  position: 'absolute',
-                  top: '12px',
-                  right: '45px',
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  backgroundColor: priorityColor,
-                  boxShadow: `0 0 4px ${priorityColor}80`
-                }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: '500', marginBottom: '4px', fontSize: '15px', wordBreak: 'break-word', color: 'rgba(0, 0, 0, 0.87)' }}>
                     {item.name}
                   </div>
                   <div style={{ fontSize: '12px', color: priorityColor, fontWeight: '500' }}>
-                    {priorityLabel} • {new Date(item.expiryDate).toLocaleDateString()}
+                    {priorityLabel} • {dateLabel}: {displayDate}
                   </div>
                 </div>
-                <button
-                  onClick={() => handleDeleteItem(item._id)}
-                  style={{
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    color: '#d32f2f',
-                    cursor: 'pointer',
-                    fontSize: '24px',
-                    fontWeight: '300',
-                    padding: '8px',
-                    minWidth: '40px',
-                    minHeight: '40px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                    flexShrink: 0,
-                    touchAction: 'manipulation',
-                    WebkitTapHighlightColor: 'transparent',
-                    borderRadius: '50%',
-                    lineHeight: '1'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'rgba(211, 47, 47, 0.12)'
-                    e.currentTarget.style.transform = 'scale(1.1)'
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent'
-                    e.currentTarget.style.transform = 'scale(1)'
-                  }}
-                  onTouchStart={(e) => {
-                    e.currentTarget.style.backgroundColor = 'rgba(211, 47, 47, 0.12)'
-                    e.currentTarget.style.transform = 'scale(0.95)'
-                  }}
-                  onTouchEnd={(e) => {
-                    setTimeout(() => {
+                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                  <button
+                    onClick={() => handleEditClick(item)}
+                    style={{
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      color: 'rgba(0, 0, 0, 0.54)',
+                      cursor: 'pointer',
+                      fontSize: '20px',
+                      fontWeight: '400',
+                      padding: '8px',
+                      minWidth: '36px',
+                      minHeight: '36px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                      flexShrink: 0,
+                      touchAction: 'manipulation',
+                      WebkitTapHighlightColor: 'transparent',
+                      borderRadius: '50%',
+                      lineHeight: '1',
+                      letterSpacing: '2px'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.08)'
+                      e.currentTarget.style.color = 'rgba(0, 0, 0, 0.87)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent'
+                      e.currentTarget.style.color = 'rgba(0, 0, 0, 0.54)'
+                    }}
+                    onTouchStart={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.08)'
+                      e.currentTarget.style.color = 'rgba(0, 0, 0, 0.87)'
+                    }}
+                    onTouchEnd={(e) => {
+                      setTimeout(() => {
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                        e.currentTarget.style.color = 'rgba(0, 0, 0, 0.54)'
+                      }, 150)
+                    }}
+                    title="Edit item"
+                    aria-label="Edit item"
+                  >
+                    ⋯
+                  </button>
+                  <button
+                    onClick={() => handleDeleteItem(item._id)}
+                    style={{
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      color: '#d32f2f',
+                      cursor: 'pointer',
+                      fontSize: '24px',
+                      fontWeight: '300',
+                      padding: '8px',
+                      minWidth: '40px',
+                      minHeight: '40px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                      flexShrink: 0,
+                      touchAction: 'manipulation',
+                      WebkitTapHighlightColor: 'transparent',
+                      borderRadius: '50%',
+                      lineHeight: '1'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(211, 47, 47, 0.12)'
+                      e.currentTarget.style.transform = 'scale(1.1)'
+                    }}
+                    onMouseLeave={(e) => {
                       e.currentTarget.style.backgroundColor = 'transparent'
                       e.currentTarget.style.transform = 'scale(1)'
-                    }, 150)
-                  }}
-                  title="Delete item"
-                  aria-label="Delete item"
-                >
-                  ×
-                </button>
+                    }}
+                    onTouchStart={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(211, 47, 47, 0.12)'
+                      e.currentTarget.style.transform = 'scale(0.95)'
+                    }}
+                    onTouchEnd={(e) => {
+                      setTimeout(() => {
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                        e.currentTarget.style.transform = 'scale(1)'
+                      }, 150)
+                    }}
+                    title="Delete item"
+                    aria-label="Delete item"
+                  >
+                    ×
+                  </button>
+                </div>
               </div>
             )
             })
@@ -694,6 +856,215 @@ function FridgeApp() {
           </div>
           </>
         )}
+
+        {isEditFormOpen && (
+          <>
+            <div 
+              className="form-backdrop"
+              onClick={handleCloseEditForm}
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                zIndex: 999,
+                backdropFilter: 'blur(2px)'
+              }}
+            />
+            <div 
+              className="edit-form"
+              style={{
+                position: 'fixed',
+                top: '80px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                backgroundColor: '#ffffff',
+                padding: '24px',
+                borderRadius: '4px',
+                width: '90%',
+                maxWidth: '400px',
+                zIndex: 1000,
+                boxShadow: '0 11px 15px -7px rgba(0, 0, 0, 0.2), 0 24px 38px 3px rgba(0, 0, 0, 0.14), 0 9px 46px 8px rgba(0, 0, 0, 0.12)',
+                maxHeight: 'calc(100vh - 100px)',
+                overflowY: 'auto'
+              }}
+            >
+            <form onSubmit={handleUpdateItem}>
+              <div style={{ marginBottom: '20px' }}>
+                <label 
+                  htmlFor="editItemName"
+                  style={{
+                    display: 'block',
+                    marginBottom: '8px',
+                    color: 'rgba(0, 0, 0, 0.87)',
+                    fontWeight: '500',
+                    fontSize: '14px'
+                  }}
+                >
+                  Item Name
+                </label>
+                <input
+                  type="text"
+                  id="editItemName"
+                  value={itemName}
+                  onChange={(e) => setItemName(e.target.value)}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: '1px solid rgba(0, 0, 0, 0.23)',
+                    borderRadius: '4px',
+                    fontSize: '16px',
+                    boxSizing: 'border-box',
+                    WebkitAppearance: 'none',
+                    touchAction: 'manipulation',
+                    backgroundColor: '#ffffff',
+                    transition: 'border-color 0.2s ease',
+                    outline: 'none'
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#6200ee'
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.23)'
+                  }}
+                />
+              </div>
+              
+              <div style={{ marginBottom: '20px' }}>
+                <label 
+                  htmlFor="editExpiryDate"
+                  style={{
+                    display: 'block',
+                    marginBottom: '8px',
+                    color: 'rgba(0, 0, 0, 0.87)',
+                    fontWeight: '500',
+                    fontSize: '14px'
+                  }}
+                >
+                  Expiry Date
+                </label>
+                <input
+                  type="date"
+                  id="editExpiryDate"
+                  value={expiryDate}
+                  onChange={(e) => setExpiryDate(e.target.value)}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    border: '1px solid rgba(0, 0, 0, 0.23)',
+                    borderRadius: '4px',
+                    fontSize: '16px',
+                    boxSizing: 'border-box',
+                    WebkitAppearance: 'none',
+                    touchAction: 'manipulation',
+                    backgroundColor: '#ffffff',
+                    transition: 'border-color 0.2s ease',
+                    outline: 'none'
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#6200ee'
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.23)'
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    color: 'rgba(0, 0, 0, 0.87)',
+                    fontWeight: '500',
+                    fontSize: '14px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isOpened}
+                    onChange={(e) => setIsOpened(e.target.checked)}
+                    style={{
+                      width: '18px',
+                      height: '18px',
+                      cursor: 'pointer',
+                      accentColor: '#6200ee'
+                    }}
+                  />
+                  <span>Item is opened</span>
+                </label>
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '24px' }}>
+                <button
+                  type="button"
+                  onClick={handleCloseEditForm}
+                  style={{
+                    padding: '10px 16px',
+                    backgroundColor: 'transparent',
+                    color: '#6200ee',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    minHeight: '36px',
+                    touchAction: 'manipulation',
+                    WebkitTapHighlightColor: 'transparent',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    transition: 'background-color 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(98, 0, 238, 0.08)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    padding: '10px 16px',
+                    backgroundColor: '#6200ee',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    minHeight: '36px',
+                    touchAction: 'manipulation',
+                    WebkitTapHighlightColor: 'transparent',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.2), 0 4px 5px 0 rgba(0, 0, 0, 0.14), 0 1px 10px 0 rgba(0, 0, 0, 0.12)',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#7c4dff'
+                    e.currentTarget.style.boxShadow = '0 3px 5px -1px rgba(0, 0, 0, 0.2), 0 6px 10px 0 rgba(0, 0, 0, 0.14), 0 1px 18px 0 rgba(0, 0, 0, 0.12)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#6200ee'
+                    e.currentTarget.style.boxShadow = '0 2px 4px -1px rgba(0, 0, 0, 0.2), 0 4px 5px 0 rgba(0, 0, 0, 0.14), 0 1px 10px 0 rgba(0, 0, 0, 0.12)'
+                  }}
+                >
+                  Update
+                </button>
+              </div>
+            </form>
+          </div>
+          </>
+        )}
       </div>
 
       <div 
@@ -748,12 +1119,27 @@ function FridgeApp() {
           ) : (
             binItems.map((item) => {
               const priorityColor = '#d32f2f' // Material Design Red for expired items
-              const daysSinceExpiry = Math.ceil((new Date().getTime() - new Date(item.expiryDate).getTime()) / (1000 * 60 * 60 * 24))
-              const expiredLabel = daysSinceExpiry === 0 ? 'Expired today' : daysSinceExpiry === 1 ? 'Expired yesterday' : `Expired ${daysSinceExpiry} days ago`
+              
+              // For opened items, show days since opened
+              let expiredLabel: string
+              let displayDate: string
+              let dateLabel: string
+              
+              if (item.isOpened && item.openedDate) {
+                const daysSinceOpened = Math.ceil((new Date().getTime() - new Date(item.openedDate).getTime()) / (1000 * 60 * 60 * 24))
+                expiredLabel = daysSinceOpened === 0 ? 'Opened today' : daysSinceOpened === 1 ? 'Opened yesterday' : `Opened ${daysSinceOpened} days ago`
+                displayDate = new Date(item.openedDate).toLocaleDateString()
+                dateLabel = 'Opened'
+              } else {
+                const daysSinceExpiry = Math.ceil((new Date().getTime() - new Date(item.expiryDate).getTime()) / (1000 * 60 * 60 * 24))
+                expiredLabel = daysSinceExpiry === 0 ? 'Expired today' : daysSinceExpiry === 1 ? 'Expired yesterday' : `Expired ${daysSinceExpiry} days ago`
+                displayDate = new Date(item.expiryDate).toLocaleDateString()
+                dateLabel = 'Expired'
+              }
               
               return (
-              <div
-                key={item._id}
+                <div
+                  key={item._id}
                 style={{
                   backgroundColor: '#ffffff',
                   border: `1px solid ${priorityColor}40`,
@@ -772,30 +1158,67 @@ function FridgeApp() {
                   boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.12), 0 1px 2px 0 rgba(0, 0, 0, 0.24)'
                 }}
               >
-                <div style={{ 
-                  position: 'absolute',
-                  top: '12px',
-                  right: '45px',
-                  width: '8px',
-                  height: '8px',
-                  borderRadius: '50%',
-                  backgroundColor: priorityColor,
-                  boxShadow: `0 0 4px ${priorityColor}80`
-                }} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: '500', marginBottom: '4px', fontSize: '15px', wordBreak: 'break-word', color: 'rgba(0, 0, 0, 0.87)' }}>
                     {item.name}
                   </div>
                   <div style={{ fontSize: '12px', color: priorityColor, fontWeight: '500' }}>
-                    {expiredLabel} • {new Date(item.expiryDate).toLocaleDateString()}
+                    {expiredLabel} • {dateLabel}: {displayDate}
                   </div>
                 </div>
-                <button
-                  onClick={() => handleDeleteItem(item._id)}
-                  style={{
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    color: '#d32f2f',
+                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                  <button
+                    onClick={() => handleEditClick(item)}
+                    style={{
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      color: 'rgba(0, 0, 0, 0.54)',
+                      cursor: 'pointer',
+                      fontSize: '20px',
+                      fontWeight: '400',
+                      padding: '8px',
+                      minWidth: '36px',
+                      minHeight: '36px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                      flexShrink: 0,
+                      touchAction: 'manipulation',
+                      WebkitTapHighlightColor: 'transparent',
+                      borderRadius: '50%',
+                      lineHeight: '1',
+                      letterSpacing: '2px'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.08)'
+                      e.currentTarget.style.color = 'rgba(0, 0, 0, 0.87)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent'
+                      e.currentTarget.style.color = 'rgba(0, 0, 0, 0.54)'
+                    }}
+                    onTouchStart={(e) => {
+                      e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.08)'
+                      e.currentTarget.style.color = 'rgba(0, 0, 0, 0.87)'
+                    }}
+                    onTouchEnd={(e) => {
+                      setTimeout(() => {
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                        e.currentTarget.style.color = 'rgba(0, 0, 0, 0.54)'
+                      }, 150)
+                    }}
+                    title="Edit item"
+                    aria-label="Edit item"
+                  >
+                    ⋯
+                  </button>
+                  <button
+                    onClick={() => handleDeleteItem(item._id)}
+                    style={{
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      color: '#d32f2f',
                     cursor: 'pointer',
                     fontSize: '24px',
                     fontWeight: '300',
@@ -835,8 +1258,9 @@ function FridgeApp() {
                 >
                   ×
                 </button>
+                </div>
               </div>
-            )
+              )
             })
           )}
         </div>
