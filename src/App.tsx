@@ -238,21 +238,34 @@ function FridgeApp() {
   }
 
   return (
-    <>
+    <div 
+      className="App"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+        width: '100%',
+        minHeight: '100vh',
+        margin: 0,
+        padding: '16px',
+        gap: '16px',
+        overflowY: 'auto',
+        paddingBottom: '24px',
+        backgroundColor: '#f5f5f5'
+      }}
+    >
       {/* User info and logout button */}
       <div
         style={{
-          position: 'fixed',
-          top: '16px',
-          right: '16px',
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
-          zIndex: 100,
           backgroundColor: '#ffffff',
           padding: '8px 16px',
           borderRadius: '24px',
-          boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.2), 0 4px 5px 0 rgba(0, 0, 0, 0.14), 0 1px 10px 0 rgba(0, 0, 0, 0.12)'
+          boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.2), 0 4px 5px 0 rgba(0, 0, 0, 0.14), 0 1px 10px 0 rgba(0, 0, 0, 0.12)',
+          marginBottom: '8px'
         }}
       >
         {user?.picture && (
@@ -302,24 +315,6 @@ function FridgeApp() {
           Logout
         </button>
       </div>
-      
-      <div 
-        className="App"
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'flex-start',
-          width: '100%',
-          minHeight: '100vh',
-          margin: 0,
-          padding: '16px',
-          gap: '16px',
-          overflowY: 'auto',
-          paddingBottom: '24px',
-          backgroundColor: '#f5f5f5'
-        }}
-      >
       <div 
         className="fridge-items"
         style={{
@@ -912,7 +907,6 @@ function FridgeApp() {
         Clear Fridge
       </button>
     </div>
-    </>
   )
 }
 
