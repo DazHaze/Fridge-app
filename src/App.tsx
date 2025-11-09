@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import './App.css'
 import { getApiUrl } from './config'
+import { useAuth } from './contexts/AuthContext'
+import Login from './components/Login'
 
 interface FridgeItem {
   _id: string
@@ -9,13 +12,15 @@ interface FridgeItem {
   createdAt?: string
 }
 
-function App() {
+function FridgeApp() {
+  const { user, logout } = useAuth()
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [itemName, setItemName] = useState('')
   const [expiryDate, setExpiryDate] = useState('')
   const [items, setItems] = useState<FridgeItem[]>([])
   const [binItems, setBinItems] = useState<FridgeItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [deletedCount, setDeletedCount] = useState(0)
 
   // Check if an item is expired
   const isExpired = (expiryDateString: string): boolean => {
@@ -24,6 +29,56 @@ function App() {
     const expiryDate = new Date(expiryDateString)
     expiryDate.setHours(0, 0, 0, 0)
     return expiryDate < today
+  }
+
+  // Get priority color based on days until expiry (Material Design colors)
+  const getPriorityColor = (expiryDateString: string): string => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const expiryDate = new Date(expiryDateString)
+    expiryDate.setHours(0, 0, 0, 0)
+    
+    // Calculate difference in days
+    const diffTime = expiryDate.getTime() - today.getTime()
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    
+    // Red: expired or expiring within 2 days
+    if (diffDays <= 2) {
+      return '#d32f2f' // Material Design Red
+    }
+    // Yellow/Orange: expiring within 3-7 days
+    else if (diffDays <= 7) {
+      return '#f57c00' // Material Design Orange
+    }
+    // Green: more than 7 days away
+    else {
+      return '#388e3c' // Material Design Green
+    }
+  }
+
+  // Get priority label text
+  const getPriorityLabel = (expiryDateString: string): string => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const expiryDate = new Date(expiryDateString)
+    expiryDate.setHours(0, 0, 0, 0)
+    
+    const diffTime = expiryDate.getTime() - today.getTime()
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+    
+    if (diffDays < 0) {
+      return 'Expired'
+    } else if (diffDays === 0) {
+      return 'Expires today'
+    } else if (diffDays === 1) {
+      return 'Expires tomorrow'
+    } else if (diffDays <= 2) {
+      return `Expires in ${diffDays} days`
+    } else if (diffDays <= 7) {
+      return `Expires in ${diffDays} days`
+    } else {
+      return `Expires in ${diffDays} days`
+    }
   }
 
   // Separate items into active and expired (bin) items
@@ -128,9 +183,17 @@ function App() {
       })
 
       if (response.ok) {
+        // Check if item was in bin before removing
+        const wasInBin = binItems.some(item => item._id === id)
+        
         // Remove from both lists in case it's in either one
         setItems(items.filter(item => item._id !== id))
         setBinItems(binItems.filter(item => item._id !== id))
+        
+        // Only increment counter if item was removed from bin
+        if (wasInBin) {
+          setDeletedCount(prev => prev + 1)
+        }
       } else {
         console.error('Error deleting item')
       }
@@ -152,8 +215,16 @@ function App() {
       if (response.ok) {
         const result = await response.json()
         console.log(`Cleared ${result.deletedCount} items from database`)
+        
+        // Count how many items were in bin before clearing
+        const binItemsCount = binItems.length
+        
         setItems([])
         setBinItems([])
+        
+        // Only add bin items to deleted counter (items removed from bin)
+        setDeletedCount(prev => prev + binItemsCount)
+        
         alert(`Successfully cleared ${result.deletedCount} item(s) from the fridge.`)
       } else {
         const errorData = await response.json().catch(() => ({}))
@@ -167,68 +238,124 @@ function App() {
   }
 
   return (
-    <div 
-      className="App"
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: '100%',
-        height: '100vh',
-        margin: 0,
-        padding: '20px',
-        gap: '20px'
-      }}
-    >
+    <>
+      {/* User info and logout button */}
+      <div
+        style={{
+          position: 'fixed',
+          top: '16px',
+          right: '16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          zIndex: 100,
+          backgroundColor: '#ffffff',
+          padding: '8px 16px',
+          borderRadius: '24px',
+          boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.2), 0 4px 5px 0 rgba(0, 0, 0, 0.14), 0 1px 10px 0 rgba(0, 0, 0, 0.12)'
+        }}
+      >
+        {user?.picture && (
+          <img
+            src={user.picture}
+            alt={user.name}
+            style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '50%'
+            }}
+          />
+        )}
+        <span
+          style={{
+            color: 'rgba(0, 0, 0, 0.87)',
+            fontSize: '14px',
+            fontWeight: '500'
+          }}
+        >
+          {user?.name}
+        </span>
+        <button
+          onClick={logout}
+          style={{
+            padding: '6px 12px',
+            backgroundColor: 'transparent',
+            color: '#d32f2f',
+            border: '1px solid #d32f2f',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '12px',
+            fontWeight: '500',
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px',
+            transition: 'all 0.2s ease'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#d32f2f'
+            e.currentTarget.style.color = '#ffffff'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent'
+            e.currentTarget.style.color = '#d32f2f'
+          }}
+        >
+          Logout
+        </button>
+      </div>
+      
+      <div 
+        className="App"
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'flex-start',
+          width: '100%',
+          minHeight: '100vh',
+          margin: 0,
+          padding: '16px',
+          gap: '16px',
+          overflowY: 'auto',
+          paddingBottom: '24px',
+          backgroundColor: '#f5f5f5'
+        }}
+      >
       <div 
         className="fridge-items"
         style={{
-          width: '300px',
-          height: '300px',
-          backgroundColor: '#000000',
-          border: '2px solid #ffffff',
+          width: '100%',
+          maxWidth: '400px',
+          minHeight: '300px',
+          height: 'auto',
+          maxHeight: '500px',
+          backgroundColor: '#ffffff',
+          border: 'none',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'flex-start',
           position: 'relative',
-          padding: '20px',
-          flexShrink: 0
+          padding: '16px',
+          flexShrink: 0,
+          borderRadius: '8px',
+          boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.2), 0 4px 5px 0 rgba(0, 0, 0, 0.14), 0 1px 10px 0 rgba(0, 0, 0, 0.12)'
         }}
       >
-        <button
-          onClick={handlePlusClick}
-          className="plus-button"
+        <h2
           style={{
-            backgroundColor: 'transparent',
-            border: '2px solid #ffffff',
-            color: '#ffffff',
-            width: '40px',
-            height: '40px',
-            borderRadius: '50%',
-            fontSize: '24px',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginTop: '10px',
-            marginBottom: '15px',
-            transition: 'all 0.3s ease',
-            flexShrink: 0
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#ffffff'
-            e.currentTarget.style.color = '#000000'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'transparent'
-            e.currentTarget.style.color = '#ffffff'
+            color: 'rgba(0, 0, 0, 0.87)',
+            fontSize: '20px',
+            fontWeight: '500',
+            margin: '0 0 16px 0',
+            textAlign: 'center',
+            letterSpacing: '0.15px'
           }}
         >
-          +
-        </button>
-
+          {user?.name 
+            ? `${user.name}${user.name.endsWith('s') || user.name.endsWith('S') ? "'" : "'s"} Fridge`
+            : 'Fridge'}
+        </h2>
+        
         <div
           style={{
             width: '100%',
@@ -241,36 +368,55 @@ function App() {
           }}
         >
           {loading ? (
-            <p style={{ color: '#ffffff', fontSize: '14px', textAlign: 'center', marginTop: '20px' }}>
+            <p style={{ color: 'rgba(0, 0, 0, 0.6)', fontSize: '14px', textAlign: 'center', marginTop: '20px' }}>
               Loading...
             </p>
           ) : items.length === 0 ? (
-            <p style={{ color: '#ffffff', fontSize: '14px', textAlign: 'center', marginTop: '20px' }}>
+            <p style={{ color: 'rgba(0, 0, 0, 0.6)', fontSize: '14px', textAlign: 'center', marginTop: '20px' }}>
               No items yet. Click + to add.
             </p>
           ) : (
-            items.map((item) => (
+            items.map((item) => {
+              const priorityColor = getPriorityColor(item.expiryDate)
+              const priorityLabel = getPriorityLabel(item.expiryDate)
+              
+              return (
               <div
                 key={item._id}
                 style={{
-                  backgroundColor: '#1a1a1a',
-                  border: '1px solid #ffffff',
+                  backgroundColor: '#ffffff',
+                  border: `1px solid ${priorityColor}40`,
+                  borderLeft: `4px solid ${priorityColor}`,
                   borderRadius: '4px',
-                  padding: '10px',
-                  color: '#ffffff',
-                  fontSize: '12px',
+                  padding: '12px',
+                  color: 'rgba(0, 0, 0, 0.87)',
+                  fontSize: '14px',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'flex-start',
-                  gap: '10px'
+                  gap: '12px',
+                  width: '100%',
+                  position: 'relative',
+                  boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.12), 0 1px 2px 0 rgba(0, 0, 0, 0.24)',
+                  transition: 'box-shadow 0.2s ease'
                 }}
               >
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>
+                <div style={{ 
+                  position: 'absolute',
+                  top: '12px',
+                  right: '45px',
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  backgroundColor: priorityColor,
+                  boxShadow: `0 0 4px ${priorityColor}80`
+                }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: '500', marginBottom: '4px', fontSize: '15px', wordBreak: 'break-word', color: 'rgba(0, 0, 0, 0.87)' }}>
                     {item.name}
                   </div>
-                  <div style={{ fontSize: '11px', color: '#cccccc' }}>
-                    Expires: {new Date(item.expiryDate).toLocaleDateString()}
+                  <div style={{ fontSize: '12px', color: priorityColor, fontWeight: '500' }}>
+                    {priorityLabel} • {new Date(item.expiryDate).toLocaleDateString()}
                   </div>
                 </div>
                 <button
@@ -278,59 +424,147 @@ function App() {
                   style={{
                     backgroundColor: 'transparent',
                     border: 'none',
-                    color: '#ffffff',
+                    color: '#d32f2f',
                     cursor: 'pointer',
-                    fontSize: '16px',
-                    padding: '4px 8px',
+                    fontSize: '24px',
+                    fontWeight: '300',
+                    padding: '8px',
+                    minWidth: '40px',
+                    minHeight: '40px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    transition: 'color 0.2s ease',
-                    flexShrink: 0
+                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                    flexShrink: 0,
+                    touchAction: 'manipulation',
+                    WebkitTapHighlightColor: 'transparent',
+                    borderRadius: '50%',
+                    lineHeight: '1'
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.color = '#ff4444'
+                    e.currentTarget.style.backgroundColor = 'rgba(211, 47, 47, 0.12)'
+                    e.currentTarget.style.transform = 'scale(1.1)'
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.color = '#ffffff'
+                    e.currentTarget.style.backgroundColor = 'transparent'
+                    e.currentTarget.style.transform = 'scale(1)'
+                  }}
+                  onTouchStart={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(211, 47, 47, 0.12)'
+                    e.currentTarget.style.transform = 'scale(0.95)'
+                  }}
+                  onTouchEnd={(e) => {
+                    setTimeout(() => {
+                      e.currentTarget.style.backgroundColor = 'transparent'
+                      e.currentTarget.style.transform = 'scale(1)'
+                    }, 150)
                   }}
                   title="Delete item"
+                  aria-label="Delete item"
                 >
-                  🗑️
+                  ×
                 </button>
               </div>
-            ))
+            )
+            })
           )}
         </div>
 
+        <button
+          onClick={handlePlusClick}
+          className="plus-button"
+          style={{
+            backgroundColor: '#6200ee',
+            border: 'none',
+            color: '#ffffff',
+            width: '56px',
+            height: '56px',
+            minWidth: '56px',
+            minHeight: '56px',
+            borderRadius: '50%',
+            fontSize: '28px',
+            fontWeight: '500',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginTop: '16px',
+            marginBottom: '8px',
+            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+            flexShrink: 0,
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+            boxShadow: '0 3px 5px -1px rgba(0, 0, 0, 0.2), 0 6px 10px 0 rgba(0, 0, 0, 0.14), 0 1px 18px 0 rgba(0, 0, 0, 0.12)'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = '#7c4dff'
+            e.currentTarget.style.boxShadow = '0 5px 5px -3px rgba(0, 0, 0, 0.2), 0 8px 10px 1px rgba(0, 0, 0, 0.14), 0 3px 14px 2px rgba(0, 0, 0, 0.12)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = '#6200ee'
+            e.currentTarget.style.boxShadow = '0 3px 5px -1px rgba(0, 0, 0, 0.2), 0 6px 10px 0 rgba(0, 0, 0, 0.14), 0 1px 18px 0 rgba(0, 0, 0, 0.12)'
+          }}
+          onTouchStart={(e) => {
+            e.currentTarget.style.backgroundColor = '#7c4dff'
+            e.currentTarget.style.transform = 'scale(0.95)'
+          }}
+          onTouchEnd={(e) => {
+            setTimeout(() => {
+              e.currentTarget.style.backgroundColor = '#6200ee'
+              e.currentTarget.style.transform = 'scale(1)'
+            }, 150)
+          }}
+        >
+          +
+        </button>
+
         {isFormOpen && (
-          <div 
-            className="input-form"
-            style={{
-              position: 'absolute',
-              top: '60px',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              backgroundColor: '#ffffff',
-              padding: '20px',
-              borderRadius: '8px',
-              width: '250px',
-              zIndex: 10,
-              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3)'
-            }}
-          >
+          <>
+            <div 
+              className="form-backdrop"
+              onClick={handleCloseForm}
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                zIndex: 999,
+                backdropFilter: 'blur(2px)'
+              }}
+            />
+            <div 
+              className="input-form"
+              style={{
+                position: 'fixed',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                backgroundColor: '#ffffff',
+                padding: '24px',
+                borderRadius: '4px',
+                width: '90%',
+                maxWidth: '400px',
+                zIndex: 1000,
+                boxShadow: '0 11px 15px -7px rgba(0, 0, 0, 0.2), 0 24px 38px 3px rgba(0, 0, 0, 0.14), 0 9px 46px 8px rgba(0, 0, 0, 0.12)',
+                maxHeight: '90vh',
+                overflowY: 'auto'
+              }}
+            >
             <form onSubmit={handleSubmit}>
-              <div style={{ marginBottom: '15px' }}>
+              <div style={{ marginBottom: '20px' }}>
                 <label 
                   htmlFor="itemName"
                   style={{
                     display: 'block',
-                    marginBottom: '5px',
-                    color: '#000000',
-                    fontWeight: 'bold'
+                    marginBottom: '8px',
+                    color: 'rgba(0, 0, 0, 0.87)',
+                    fontWeight: '500',
+                    fontSize: '14px'
                   }}
                 >
-                  Item Name:
+                  Item Name
                 </label>
                 <input
                   type="text"
@@ -340,26 +574,38 @@ function App() {
                   required
                   style={{
                     width: '100%',
-                    padding: '8px',
-                    border: '1px solid #ccc',
+                    padding: '12px 16px',
+                    border: '1px solid rgba(0, 0, 0, 0.23)',
                     borderRadius: '4px',
-                    fontSize: '14px',
-                    boxSizing: 'border-box'
+                    fontSize: '16px',
+                    boxSizing: 'border-box',
+                    WebkitAppearance: 'none',
+                    touchAction: 'manipulation',
+                    backgroundColor: '#ffffff',
+                    transition: 'border-color 0.2s ease',
+                    outline: 'none'
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#6200ee'
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.23)'
                   }}
                 />
               </div>
               
-              <div style={{ marginBottom: '15px' }}>
+              <div style={{ marginBottom: '20px' }}>
                 <label 
                   htmlFor="expiryDate"
                   style={{
                     display: 'block',
-                    marginBottom: '5px',
-                    color: '#000000',
-                    fontWeight: 'bold'
+                    marginBottom: '8px',
+                    color: 'rgba(0, 0, 0, 0.87)',
+                    fontWeight: '500',
+                    fontSize: '14px'
                   }}
                 >
-                  Expiry Date:
+                  Expiry Date
                 </label>
                 <input
                   type="date"
@@ -369,27 +615,51 @@ function App() {
                   required
                   style={{
                     width: '100%',
-                    padding: '8px',
-                    border: '1px solid #ccc',
+                    padding: '12px 16px',
+                    border: '1px solid rgba(0, 0, 0, 0.23)',
                     borderRadius: '4px',
-                    fontSize: '14px',
-                    boxSizing: 'border-box'
+                    fontSize: '16px',
+                    boxSizing: 'border-box',
+                    WebkitAppearance: 'none',
+                    touchAction: 'manipulation',
+                    backgroundColor: '#ffffff',
+                    transition: 'border-color 0.2s ease',
+                    outline: 'none'
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#6200ee'
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.23)'
                   }}
                 />
               </div>
 
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '24px' }}>
                 <button
                   type="button"
                   onClick={handleCloseForm}
                   style={{
-                    padding: '8px 16px',
-                    backgroundColor: '#ccc',
-                    color: '#000000',
+                    padding: '10px 16px',
+                    backgroundColor: 'transparent',
+                    color: '#6200ee',
                     border: 'none',
                     borderRadius: '4px',
                     cursor: 'pointer',
-                    fontSize: '14px'
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    minHeight: '36px',
+                    touchAction: 'manipulation',
+                    WebkitTapHighlightColor: 'transparent',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    transition: 'background-color 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(98, 0, 238, 0.08)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent'
                   }}
                 >
                   Cancel
@@ -397,13 +667,29 @@ function App() {
                 <button
                   type="submit"
                   style={{
-                    padding: '8px 16px',
-                    backgroundColor: '#000000',
+                    padding: '10px 16px',
+                    backgroundColor: '#6200ee',
                     color: '#ffffff',
                     border: 'none',
                     borderRadius: '4px',
                     cursor: 'pointer',
-                    fontSize: '14px'
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    minHeight: '36px',
+                    touchAction: 'manipulation',
+                    WebkitTapHighlightColor: 'transparent',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.2), 0 4px 5px 0 rgba(0, 0, 0, 0.14), 0 1px 10px 0 rgba(0, 0, 0, 0.12)',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#7c4dff'
+                    e.currentTarget.style.boxShadow = '0 3px 5px -1px rgba(0, 0, 0, 0.2), 0 6px 10px 0 rgba(0, 0, 0, 0.14), 0 1px 18px 0 rgba(0, 0, 0, 0.12)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = '#6200ee'
+                    e.currentTarget.style.boxShadow = '0 2px 4px -1px rgba(0, 0, 0, 0.2), 0 4px 5px 0 rgba(0, 0, 0, 0.14), 0 1px 10px 0 rgba(0, 0, 0, 0.12)'
                   }}
                 >
                   Add
@@ -411,32 +697,39 @@ function App() {
               </div>
             </form>
           </div>
+          </>
         )}
       </div>
 
       <div 
         className="bin"
         style={{
-          width: '300px',
-          height: '300px',
-          backgroundColor: '#000000',
-          border: '2px solid #ffffff',
+          width: '100%',
+          maxWidth: '400px',
+          minHeight: '300px',
+          height: 'auto',
+          maxHeight: '500px',
+          backgroundColor: '#ffffff',
+          border: 'none',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'flex-start',
           position: 'relative',
-          padding: '20px',
-          flexShrink: 0
+          padding: '16px',
+          flexShrink: 0,
+          borderRadius: '8px',
+          boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.2), 0 4px 5px 0 rgba(0, 0, 0, 0.14), 0 1px 10px 0 rgba(0, 0, 0, 0.12)'
         }}
       >
         <h2
           style={{
-            color: '#ffffff',
+            color: 'rgba(0, 0, 0, 0.87)',
             fontSize: '20px',
-            fontWeight: 'bold',
-            margin: '10px 0 15px 0',
-            textAlign: 'center'
+            fontWeight: '500',
+            margin: '8px 0 16px 0',
+            textAlign: 'center',
+            letterSpacing: '0.15px'
           }}
         >
           Bin
@@ -454,32 +747,52 @@ function App() {
           }}
         >
           {binItems.length === 0 ? (
-            <p style={{ color: '#ffffff', fontSize: '14px', textAlign: 'center', marginTop: '20px' }}>
+            <p style={{ color: 'rgba(0, 0, 0, 0.6)', fontSize: '14px', textAlign: 'center', marginTop: '20px' }}>
               No items in bin.
             </p>
           ) : (
-            binItems.map((item) => (
+            binItems.map((item) => {
+              const priorityColor = '#d32f2f' // Material Design Red for expired items
+              const daysSinceExpiry = Math.ceil((new Date().getTime() - new Date(item.expiryDate).getTime()) / (1000 * 60 * 60 * 24))
+              const expiredLabel = daysSinceExpiry === 0 ? 'Expired today' : daysSinceExpiry === 1 ? 'Expired yesterday' : `Expired ${daysSinceExpiry} days ago`
+              
+              return (
               <div
                 key={item._id}
                 style={{
-                  backgroundColor: '#1a1a1a',
-                  border: '1px solid #ffffff',
+                  backgroundColor: '#ffffff',
+                  border: `1px solid ${priorityColor}40`,
+                  borderLeft: `4px solid ${priorityColor}`,
                   borderRadius: '4px',
-                  padding: '10px',
-                  color: '#ffffff',
-                  fontSize: '12px',
+                  padding: '12px',
+                  color: 'rgba(0, 0, 0, 0.87)',
+                  fontSize: '14px',
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'flex-start',
-                  gap: '10px'
+                  gap: '12px',
+                  width: '100%',
+                  position: 'relative',
+                  opacity: 0.85,
+                  boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.12), 0 1px 2px 0 rgba(0, 0, 0, 0.24)'
                 }}
               >
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>
+                <div style={{ 
+                  position: 'absolute',
+                  top: '12px',
+                  right: '45px',
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  backgroundColor: priorityColor,
+                  boxShadow: `0 0 4px ${priorityColor}80`
+                }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: '500', marginBottom: '4px', fontSize: '15px', wordBreak: 'break-word', color: 'rgba(0, 0, 0, 0.87)' }}>
                     {item.name}
                   </div>
-                  <div style={{ fontSize: '11px', color: '#ff4444' }}>
-                    Expired: {new Date(item.expiryDate).toLocaleDateString()}
+                  <div style={{ fontSize: '12px', color: priorityColor, fontWeight: '500' }}>
+                    {expiredLabel} • {new Date(item.expiryDate).toLocaleDateString()}
                   </div>
                 </div>
                 <button
@@ -487,59 +800,152 @@ function App() {
                   style={{
                     backgroundColor: 'transparent',
                     border: 'none',
-                    color: '#ffffff',
+                    color: '#d32f2f',
                     cursor: 'pointer',
-                    fontSize: '16px',
-                    padding: '4px 8px',
+                    fontSize: '24px',
+                    fontWeight: '300',
+                    padding: '8px',
+                    minWidth: '40px',
+                    minHeight: '40px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    transition: 'color 0.2s ease',
-                    flexShrink: 0
+                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                    flexShrink: 0,
+                    touchAction: 'manipulation',
+                    WebkitTapHighlightColor: 'transparent',
+                    borderRadius: '50%',
+                    lineHeight: '1'
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.color = '#ff4444'
+                    e.currentTarget.style.backgroundColor = 'rgba(211, 47, 47, 0.12)'
+                    e.currentTarget.style.transform = 'scale(1.1)'
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.color = '#ffffff'
+                    e.currentTarget.style.backgroundColor = 'transparent'
+                    e.currentTarget.style.transform = 'scale(1)'
+                  }}
+                  onTouchStart={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(211, 47, 47, 0.12)'
+                    e.currentTarget.style.transform = 'scale(0.95)'
+                  }}
+                  onTouchEnd={(e) => {
+                    setTimeout(() => {
+                      e.currentTarget.style.backgroundColor = 'transparent'
+                      e.currentTarget.style.transform = 'scale(1)'
+                    }, 150)
                   }}
                   title="Delete item"
+                  aria-label="Delete item"
                 >
-                  🗑️
+                  ×
                 </button>
               </div>
-            ))
+            )
+            })
           )}
+        </div>
+        
+        <div
+          style={{
+            width: '100%',
+            marginTop: '16px',
+            paddingTop: '16px',
+            borderTop: '1px solid rgba(0, 0, 0, 0.12)',
+            textAlign: 'center'
+          }}
+        >
+          <p
+            style={{
+              color: 'rgba(0, 0, 0, 0.6)',
+              fontSize: '14px',
+              fontWeight: '500',
+              margin: 0
+            }}
+          >
+            Total Wasted: <span style={{ color: '#d32f2f', fontWeight: '600' }}>{deletedCount}</span>
+          </p>
         </div>
       </div>
 
       <button
         onClick={handleClearFridge}
         style={{
-          width: '300px',
+          width: '100%',
+          maxWidth: '400px',
           padding: '12px 24px',
-          backgroundColor: '#ff4444',
+          backgroundColor: '#d32f2f',
           color: '#ffffff',
-          border: '2px solid #ffffff',
-          borderRadius: '8px',
-          fontSize: '16px',
-          fontWeight: 'bold',
+          border: 'none',
+          borderRadius: '4px',
+          fontSize: '14px',
+          fontWeight: '500',
           cursor: 'pointer',
-          transition: 'all 0.3s ease',
-          marginTop: '10px'
+          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+          marginTop: '8px',
+          minHeight: '36px',
+          touchAction: 'manipulation',
+          WebkitTapHighlightColor: 'transparent',
+          textTransform: 'uppercase',
+          letterSpacing: '0.5px',
+          boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.2), 0 4px 5px 0 rgba(0, 0, 0, 0.14), 0 1px 10px 0 rgba(0, 0, 0, 0.12)'
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = '#cc0000'
-          e.currentTarget.style.transform = 'scale(1.05)'
+          e.currentTarget.style.backgroundColor = '#c62828'
+          e.currentTarget.style.boxShadow = '0 3px 5px -1px rgba(0, 0, 0, 0.2), 0 6px 10px 0 rgba(0, 0, 0, 0.14), 0 1px 18px 0 rgba(0, 0, 0, 0.12)'
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = '#ff4444'
-          e.currentTarget.style.transform = 'scale(1)'
+          e.currentTarget.style.backgroundColor = '#d32f2f'
+          e.currentTarget.style.boxShadow = '0 2px 4px -1px rgba(0, 0, 0, 0.2), 0 4px 5px 0 rgba(0, 0, 0, 0.14), 0 1px 10px 0 rgba(0, 0, 0, 0.12)'
+        }}
+        onTouchStart={(e) => {
+          e.currentTarget.style.backgroundColor = '#c62828'
+          e.currentTarget.style.transform = 'scale(0.98)'
+        }}
+        onTouchEnd={(e) => {
+          setTimeout(() => {
+            e.currentTarget.style.backgroundColor = '#d32f2f'
+            e.currentTarget.style.transform = 'scale(1)'
+          }, 150)
         }}
       >
         Clear Fridge
       </button>
     </div>
+    </>
+  )
+}
+
+function App() {
+  const { isAuthenticated, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minHeight: '100vh',
+          backgroundColor: '#f5f5f5'
+        }}
+      >
+        <p style={{ color: 'rgba(0, 0, 0, 0.6)', fontSize: '16px' }}>Loading...</p>
+      </div>
+    )
+  }
+
+  return (
+    <Routes>
+      <Route
+        path="/"
+        element={isAuthenticated ? <FridgeApp /> : <Navigate to="/login" replace />}
+      />
+      <Route
+        path="/login"
+        element={isAuthenticated ? <Navigate to="/" replace /> : <Login />}
+      />
+    </Routes>
   )
 }
 
