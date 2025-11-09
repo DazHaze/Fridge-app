@@ -177,6 +177,14 @@ function FridgeApp() {
   }
 
   const handleEditClick = (item: FridgeItem) => {
+    // Verify item still exists in current state
+    const itemExists = [...items, ...binItems].some(i => i._id === item._id)
+    if (!itemExists) {
+      alert('This item no longer exists. Refreshing the list...')
+      fetchItems()
+      return
+    }
+    
     setEditingItemId(item._id)
     setItemName(item.name)
     setExpiryDate(item.expiryDate.split('T')[0]) // Format date for input
@@ -238,8 +246,22 @@ function FridgeApp() {
         // Refresh items to ensure correct separation
         fetchItems()
       } else {
-        console.error('Error updating item')
-        alert('Failed to update item. Please try again.')
+        let errorMessage = 'Failed to update item. Please try again.'
+        try {
+          const errorData = await response.json()
+          console.error('Error updating item:', errorData)
+          errorMessage = errorData.message || errorMessage
+          
+          // If item not found, refresh the list in case it was deleted
+          if (response.status === 404) {
+            console.log('Item not found, refreshing items list...')
+            fetchItems()
+            errorMessage = 'Item not found. It may have been deleted. The list has been refreshed.'
+          }
+        } catch (parseError) {
+          console.error('Error response status:', response.status, response.statusText)
+        }
+        alert(errorMessage)
       }
     } catch (error) {
       console.error('Error updating item:', error)
