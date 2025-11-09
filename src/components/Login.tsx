@@ -68,7 +68,7 @@ const Login = () => {
       window.google.accounts.id.renderButton(buttonRef.current, {
         theme: 'outline',
         size: 'large',
-        width: 300
+        width: '100%'
       })
     }
   }, [login])
@@ -82,7 +82,7 @@ const Login = () => {
         justifyContent: 'flex-start',
         minHeight: '100vh',
         backgroundColor: '#f5f5f5',
-        padding: '16px',
+        padding: '8px',
         paddingTop: '40px'
       }}
     >
@@ -92,9 +92,10 @@ const Login = () => {
           padding: '64px',
           borderRadius: '8px',
           boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.2), 0 4px 5px 0 rgba(0, 0, 0, 0.14), 0 1px 10px 0 rgba(0, 0, 0, 0.12)',
-          width: 'calc(100% - 32px)',
+          width: '100%',
           maxWidth: 'none',
-          textAlign: 'center'
+          textAlign: 'center',
+          boxSizing: 'border-box'
         }}
       >
         <h1
@@ -118,7 +119,7 @@ const Login = () => {
         >
           Sign in with your Google account to continue
         </p>
-        <div ref={buttonRef} style={{ display: 'flex', justifyContent: 'center' }} />
+        <div ref={buttonRef} style={{ display: 'flex', justifyContent: 'center', width: '100%' }} />
       </div>
     </div>
   )
