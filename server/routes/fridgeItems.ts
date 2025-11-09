@@ -80,6 +80,11 @@ router.put('/:id', async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'Name, expiry date, and userId are required' })
     }
 
+    // Validate MongoDB ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid item ID format' })
+    }
+
     const updateData: any = {
       name,
       expiryDate: new Date(expiryDate),
@@ -100,6 +105,11 @@ router.put('/:id', async (req: Request, res: Response) => {
     )
     
     if (!updatedItem) {
+      // Check if item exists but belongs to different user
+      const itemExists = await FridgeItem.findById(id)
+      if (itemExists) {
+        return res.status(403).json({ message: 'Item belongs to a different user' })
+      }
       return res.status(404).json({ message: 'Item not found' })
     }
 
