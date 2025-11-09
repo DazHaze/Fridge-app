@@ -79,10 +79,11 @@ const Login = () => {
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'flex-start',
         minHeight: '100vh',
         backgroundColor: '#f5f5f5',
-        padding: '20px'
+        padding: '20px',
+        paddingTop: '40px'
       }}
     >
       <div
