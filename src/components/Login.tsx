@@ -82,7 +82,7 @@ const Login = () => {
         justifyContent: 'flex-start',
         minHeight: '100vh',
         backgroundColor: '#f5f5f5',
-        padding: '20px',
+        padding: '16px',
         paddingTop: '40px'
       }}
     >
@@ -92,8 +92,8 @@ const Login = () => {
           padding: '64px',
           borderRadius: '8px',
           boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.2), 0 4px 5px 0 rgba(0, 0, 0, 0.14), 0 1px 10px 0 rgba(0, 0, 0, 0.12)',
-          maxWidth: '600px',
-          width: '100%',
+          width: 'calc(100% - 32px)',
+          maxWidth: 'none',
           textAlign: 'center'
         }}
       >
