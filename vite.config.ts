@@ -3,9 +3,9 @@ import react from '@vitejs/plugin-react'
 
 // https://vite.dev/config/
 // For GitHub Pages, set the base to your repository name
-// Note: GitHub Pages URLs are typically lowercase, so use '/Fridge-app/' to match your repo name exactly
+// Note: GitHub Pages URLs are lowercase, so use '/fridge-app/' (lowercase)
 // If deploying to root domain, use '/'
-const base = process.env.VITE_BASE_PATH || (process.env.NODE_ENV === 'production' ? '/Fridge-app/' : '/')
+const base = process.env.VITE_BASE_PATH || (process.env.NODE_ENV === 'production' ? '/fridge-app/' : '/')
 
 export default defineConfig({
   plugins: [react()],
