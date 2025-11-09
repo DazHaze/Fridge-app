@@ -28,6 +28,14 @@ function FridgeApp() {
   const [loading, setLoading] = useState(true)
   const [deletedCount, setDeletedCount] = useState(0)
 
+  // Capitalize item name (first letter of each word)
+  const capitalizeName = (name: string): string => {
+    return name
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ')
+  }
+
   // Check if an item is expired
   const isExpired = (item: FridgeItem): boolean => {
     const today = new Date()
@@ -206,7 +214,7 @@ function FridgeApp() {
 
     try {
       const updateData: any = {
-        name: itemName,
+        name: capitalizeName(itemName.trim()),
         expiryDate: expiryDate,
         userId: userId,
         isOpened: isOpened
@@ -278,7 +286,7 @@ function FridgeApp() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          name: itemName,
+          name: capitalizeName(itemName.trim()),
           expiryDate: expiryDate,
           userId: userId
         })
@@ -544,7 +552,7 @@ function FridgeApp() {
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: '500', marginBottom: '4px', fontSize: '15px', wordBreak: 'break-word', color: 'rgba(0, 0, 0, 0.87)' }}>
-                    {item.name}
+                    {capitalizeName(item.name)}
                   </div>
                   <div style={{ fontSize: '12px', color: priorityColor, fontWeight: '500' }}>
                     {priorityLabel} • {dateLabel}: {displayDate}
@@ -961,7 +969,7 @@ function FridgeApp() {
                   style={{
                     display: 'block',
                     marginBottom: '8px',
-                    color: 'rgba(0, 0, 0, 0.87)',
+                    color: isOpened ? 'rgba(0, 0, 0, 0.38)' : 'rgba(0, 0, 0, 0.87)',
                     fontWeight: '500',
                     fontSize: '14px'
                   }}
@@ -973,7 +981,8 @@ function FridgeApp() {
                   id="editExpiryDate"
                   value={expiryDate}
                   onChange={(e) => setExpiryDate(e.target.value)}
-                  required
+                  required={!isOpened}
+                  disabled={isOpened}
                   style={{
                     width: '100%',
                     padding: '12px 16px',
@@ -983,12 +992,16 @@ function FridgeApp() {
                     boxSizing: 'border-box',
                     WebkitAppearance: 'none',
                     touchAction: 'manipulation',
-                    backgroundColor: '#ffffff',
+                    backgroundColor: isOpened ? 'rgba(0, 0, 0, 0.04)' : '#ffffff',
+                    color: isOpened ? 'rgba(0, 0, 0, 0.38)' : 'rgba(0, 0, 0, 0.87)',
+                    cursor: isOpened ? 'not-allowed' : 'text',
                     transition: 'border-color 0.2s ease',
                     outline: 'none'
                   }}
                   onFocus={(e) => {
-                    e.currentTarget.style.borderColor = '#6200ee'
+                    if (!isOpened) {
+                      e.currentTarget.style.borderColor = '#6200ee'
+                    }
                   }}
                   onBlur={(e) => {
                     e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.23)'
@@ -1019,7 +1032,7 @@ function FridgeApp() {
                       accentColor: '#6200ee'
                     }}
                   />
-                  <span>Item is opened</span>
+                  <span>{itemName} is opened</span>
                 </label>
               </div>
 
@@ -1182,7 +1195,7 @@ function FridgeApp() {
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: '500', marginBottom: '4px', fontSize: '15px', wordBreak: 'break-word', color: 'rgba(0, 0, 0, 0.87)' }}>
-                    {item.name}
+                    {capitalizeName(item.name)}
                   </div>
                   <div style={{ fontSize: '12px', color: priorityColor, fontWeight: '500' }}>
                     {expiredLabel} • {dateLabel}: {displayDate}

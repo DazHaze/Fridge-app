@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 
 declare global {
@@ -26,12 +26,16 @@ declare global {
 const Login = () => {
   const { login } = useAuth()
   const buttonRef = useRef<HTMLDivElement>(null)
+  const [buttonLoading, setButtonLoading] = useState(true)
+  const [buttonError, setButtonError] = useState(false)
 
   useEffect(() => {
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
 
     if (!clientId) {
       console.error('VITE_GOOGLE_CLIENT_ID is not set in environment variables')
+      setButtonError(true)
+      setButtonLoading(false)
       return
     }
 
@@ -59,16 +63,64 @@ const Login = () => {
       }
     }
 
-    if (window.google && buttonRef.current) {
-      window.google.accounts.id.initialize({
-        client_id: clientId,
-        callback: handleCredentialResponse
-      })
+    // Function to initialize Google Sign-In
+    const initializeGoogleSignIn = () => {
+      if (window.google?.accounts?.id && buttonRef.current) {
+        try {
+          window.google.accounts.id.initialize({
+            client_id: clientId,
+            callback: handleCredentialResponse
+          })
 
-      window.google.accounts.id.renderButton(buttonRef.current, {
-        theme: 'outline',
-        size: 'large'
-      })
+          window.google.accounts.id.renderButton(buttonRef.current, {
+            theme: 'outline',
+            size: 'large'
+          })
+          
+          setButtonLoading(false)
+          setButtonError(false)
+        } catch (error) {
+          console.error('Error initializing Google Sign-In:', error)
+          setButtonError(true)
+          setButtonLoading(false)
+        }
+      } else if (!window.google) {
+        // Google script not loaded yet, wait and retry
+        setTimeout(initializeGoogleSignIn, 100)
+      } else if (!buttonRef.current) {
+        // Button ref not ready yet
+        setTimeout(initializeGoogleSignIn, 100)
+      }
+    }
+
+    // Wait for Google script to load
+    let checkInterval: NodeJS.Timeout | null = null
+    
+    if (window.google) {
+      initializeGoogleSignIn()
+    } else {
+      // Poll for Google script to load (max 5 seconds)
+      let attempts = 0
+      const maxAttempts = 50
+      checkInterval = setInterval(() => {
+        attempts++
+        if (window.google) {
+          if (checkInterval) clearInterval(checkInterval)
+          initializeGoogleSignIn()
+        } else if (attempts >= maxAttempts) {
+          if (checkInterval) clearInterval(checkInterval)
+          console.error('Google Identity Services script failed to load')
+          setButtonError(true)
+          setButtonLoading(false)
+        }
+      }, 100)
+    }
+
+    // Cleanup function
+    return () => {
+      if (checkInterval) {
+        clearInterval(checkInterval)
+      }
     }
   }, [login])
 
@@ -118,7 +170,28 @@ const Login = () => {
         >
           Sign in with your Google account to continue
         </p>
-        <div ref={buttonRef} style={{ display: 'flex', justifyContent: 'center', width: '100%' }} />
+        <div 
+          ref={buttonRef} 
+          style={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            width: '100%',
+            minHeight: '40px',
+            alignItems: 'center'
+          }} 
+        />
+        {buttonLoading && (
+          <p style={{ color: 'rgba(0, 0, 0, 0.6)', fontSize: '14px', marginTop: '16px' }}>
+            Loading sign-in options...
+          </p>
+        )}
+        {buttonError && (
+          <div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#ffebee', borderRadius: '4px' }}>
+            <p style={{ color: '#c62828', fontSize: '14px', margin: 0 }}>
+              Unable to load Google Sign-In. Please check your connection and try refreshing the page.
+            </p>
+          </div>
+        )}
       </div>
     </div>
   )
