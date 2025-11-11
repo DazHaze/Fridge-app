@@ -25,6 +25,7 @@
           
           if (!hasBasePath) {
             // Path doesn't have base path, prepend it
+            // Remove leading slash if present to avoid double slashes
             routerPath = basePath + routerPath.replace(/^\//, '');
           } else {
             // Normalize casing to match basePath
@@ -40,7 +41,16 @@
           
           // Immediately replace the URL before React Router loads
           // Use replaceState to avoid adding to history and prevent reload
+          // This must happen synchronously before any React code runs
           window.history.replaceState(null, '', routerPath);
+          
+          // Force update location object properties
+          if (window.location.pathname !== routerPath.split('?')[0].split('#')[0]) {
+            // If replaceState didn't work, try again after a microtask
+            Promise.resolve().then(function() {
+              window.history.replaceState(null, '', routerPath);
+            });
+          }
         }
       })();
     </script>
