@@ -13,16 +13,19 @@
       // Store the full URL path in sessionStorage
       sessionStorage.setItem('githubPagesRedirect', path + search + hash);
       
-      // Try multiple possible index.html locations
-      // First try root, then try common subdirectory paths
-      var possiblePaths = [
-        '/index.html',
-        '/fridge-app/index.html',
-        '/Fridge-app/index.html'
-      ];
+      // Detect the actual base path by checking where we are
+      // If path is like /fridge-app/invite/accept, base is /fridge-app/
+      // If path is like /invite/accept, base is /
+      var pathParts = path.split('/').filter(Boolean);
+      var basePath = '/';
       
-      // Try redirecting to root first (most common case)
-      window.location.replace('/index.html');
+      // Check if we're in a known subdirectory
+      if (pathParts.length > 0 && (pathParts[0] === 'fridge-app' || pathParts[0] === 'Fridge-app')) {
+        basePath = '/' + pathParts[0] + '/';
+      }
+      
+      // Redirect to index.html at the detected base path
+      window.location.replace(basePath + 'index.html');
     </script>
   </head>
   <body>
