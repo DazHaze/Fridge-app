@@ -6,6 +6,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Darragh's Fridge</title>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script>
+      // Restore path from GitHub Pages 404 redirect
+      // This must run before React Router initializes
+      var redirectPath = sessionStorage.getItem('githubPagesRedirect');
+      if (redirectPath && window.location.pathname === '/index.html') {
+        sessionStorage.removeItem('githubPagesRedirect');
+        // Replace the current history entry with the original path
+        window.history.replaceState(null, '', redirectPath);
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
