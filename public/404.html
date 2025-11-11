@@ -13,18 +13,11 @@
       // Store the full URL path in sessionStorage
       sessionStorage.setItem('githubPagesRedirect', path + search + hash);
       
-      // Try multiple possible base paths
-      // GitHub Pages can serve from root or subdirectory
-      var possiblePaths = [
-        '/index.html',           // Root
-        '/Fridge-app/index.html', // Repository name with capital
-        '/fridge-app/index.html'  // Repository name lowercase
-      ];
-      
-      // Try root first (most common for user pages)
+      // Always redirect to root index.html
+      // The index.html will handle path restoration
       window.location.replace('/index.html');
     </script>
-    <!-- Fallback meta refresh for browsers without JS -->
+    <!-- Fallback meta refresh -->
     <meta http-equiv="refresh" content="0; url=/index.html">
   </head>
   <body>
@@ -32,8 +25,6 @@
     <noscript>
       <p>Please enable JavaScript to use this application.</p>
       <p><a href="/index.html">Go to home page</a></p>
-      <p><a href="/Fridge-app/index.html">Go to home page (Fridge-app)</a></p>
-      <p><a href="/fridge-app/index.html">Go to home page (fridge-app)</a></p>
     </noscript>
   </body>
 </html>
