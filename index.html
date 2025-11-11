@@ -12,15 +12,36 @@
       var redirectPath = sessionStorage.getItem('githubPagesRedirect');
       if (redirectPath) {
         sessionStorage.removeItem('githubPagesRedirect');
-        // Determine base path
+        
+        // Determine base path from current location
+        var currentPath = window.location.pathname;
         var basePath = '/';
-        if (redirectPath.startsWith('/fridge-app/') || redirectPath.startsWith('/Fridge-app/')) {
-          basePath = redirectPath.split('/').slice(0, 2).join('/') + '/';
+        
+        // Check if we're in a subdirectory (like /fridge-app/index.html)
+        if (currentPath.includes('/index.html')) {
+          var pathBeforeIndex = currentPath.split('/index.html')[0];
+          if (pathBeforeIndex && pathBeforeIndex !== '/') {
+            basePath = pathBeforeIndex + '/';
+          }
         }
+        
         // Remove base path from redirect path for React Router
-        var routerPath = redirectPath.startsWith(basePath) 
-          ? redirectPath.slice(basePath.length - 1) 
-          : redirectPath;
+        var routerPath = redirectPath;
+        if (basePath !== '/' && redirectPath.startsWith(basePath)) {
+          routerPath = redirectPath.slice(basePath.length - 1);
+        } else if (redirectPath.startsWith('/fridge-app/') || redirectPath.startsWith('/Fridge-app/')) {
+          // Handle case where base path is in the redirect path
+          var pathParts = redirectPath.split('/').filter(Boolean);
+          if (pathParts.length > 1) {
+            routerPath = '/' + pathParts.slice(1).join('/');
+          }
+        }
+        
+        // Ensure router path starts with /
+        if (!routerPath.startsWith('/')) {
+          routerPath = '/' + routerPath;
+        }
+        
         // Replace the current history entry with the original path
         window.history.replaceState(null, '', routerPath);
       }
