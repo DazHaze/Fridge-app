@@ -13,26 +13,27 @@
       // Store the full URL path in sessionStorage
       sessionStorage.setItem('githubPagesRedirect', path + search + hash);
       
-      // Detect the actual base path by checking where we are
-      // If path is like /fridge-app/invite/accept, base is /fridge-app/
-      // If path is like /invite/accept, base is /
-      var pathParts = path.split('/').filter(Boolean);
-      var basePath = '/';
+      // Try multiple possible base paths
+      // GitHub Pages can serve from root or subdirectory
+      var possiblePaths = [
+        '/index.html',           // Root
+        '/Fridge-app/index.html', // Repository name with capital
+        '/fridge-app/index.html'  // Repository name lowercase
+      ];
       
-      // Check if we're in a known subdirectory
-      if (pathParts.length > 0 && (pathParts[0] === 'fridge-app' || pathParts[0] === 'Fridge-app')) {
-        basePath = '/' + pathParts[0] + '/';
-      }
-      
-      // Redirect to index.html at the detected base path
-      window.location.replace(basePath + 'index.html');
+      // Try root first (most common for user pages)
+      window.location.replace('/index.html');
     </script>
+    <!-- Fallback meta refresh for browsers without JS -->
+    <meta http-equiv="refresh" content="0; url=/index.html">
   </head>
   <body>
     <p>Redirecting...</p>
     <noscript>
       <p>Please enable JavaScript to use this application.</p>
       <p><a href="/index.html">Go to home page</a></p>
+      <p><a href="/Fridge-app/index.html">Go to home page (Fridge-app)</a></p>
+      <p><a href="/fridge-app/index.html">Go to home page (fridge-app)</a></p>
     </noscript>
   </body>
 </html>
