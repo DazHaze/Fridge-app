@@ -83,7 +83,13 @@ router.post('/', async (req: Request, res: Response) => {
     })
 
     const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
-    const acceptLink = `${baseUrl.replace(/\/+$/, '')}/invite/accept?token=${token}`
+    // Ensure baseUrl ends with /Fridge-app/ for GitHub Pages
+    // If FRONTEND_URL doesn't include the base path, append it
+    let finalBaseUrl = baseUrl.replace(/\/+$/, '')
+    if (!finalBaseUrl.includes('/Fridge-app') && !finalBaseUrl.includes('/fridge-app')) {
+      finalBaseUrl = finalBaseUrl + '/Fridge-app'
+    }
+    const acceptLink = `${finalBaseUrl}/invite/accept?token=${token}`
 
     if (transporter) {
       // For Gmail, the "from" address must match the authenticated account
