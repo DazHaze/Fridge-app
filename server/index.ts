@@ -20,18 +20,47 @@ const allowedOrigins = [
   process.env.GITHUB_PAGES_URL
 ].filter(Boolean) // Remove undefined values
 
+// Extract base domain from FRONTEND_URL (e.g., https://dazhaze.github.io/Fridge-app -> https://dazhaze.github.io)
+if (process.env.FRONTEND_URL) {
+  try {
+    const url = new URL(process.env.FRONTEND_URL)
+    const baseOrigin = `${url.protocol}//${url.host}`
+    if (!allowedOrigins.includes(baseOrigin)) {
+      allowedOrigins.push(baseOrigin)
+    }
+  } catch (e) {
+    // Invalid URL, skip
+  }
+}
+
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true)
     
-    if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+    // Check if origin matches any allowed origin
+    const isAllowed = allowedOrigins.some(allowed => {
+      if (!allowed) return false
+      // Exact match
+      if (origin === allowed) return true
+      // Check if origin is the base domain of an allowed URL
+      try {
+        const originUrl = new URL(origin)
+        const allowedUrl = new URL(allowed)
+        return originUrl.origin === allowedUrl.origin
+      } catch {
+        return false
+      }
+    })
+    
+    if (allowedOrigins.length === 0 || isAllowed) {
       callback(null, true)
     } else {
       // For development, allow all origins
       if (process.env.NODE_ENV !== 'production') {
         callback(null, true)
       } else {
+        console.log(`CORS blocked origin: ${origin}, allowed: ${allowedOrigins.join(', ')}`)
         callback(new Error('Not allowed by CORS'))
       }
     }
