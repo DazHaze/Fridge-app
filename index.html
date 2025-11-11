@@ -15,7 +15,7 @@
         
         // Determine the actual base path from current location
         var currentPath = window.location.pathname;
-        var basePath = '/';
+        var basePath = '/Fridge-app/'; // Default to known base path
         
         // Check if we're in a subdirectory
         if (currentPath.includes('/index.html')) {
@@ -31,13 +31,24 @@
           }
         }
         
-        // Restore the path - keep it as-is if it already includes base path
+        // Restore the path - ensure it includes the base path
         var routerPath = redirectPath;
         
-        // If redirect path doesn't include base path, add it
-        if (basePath !== '/' && !routerPath.startsWith(basePath)) {
-          // Remove leading slash from redirect path if present, then prepend base path
-          routerPath = basePath + routerPath.replace(/^\//, '');
+        // If redirect path doesn't start with base path, prepend it
+        if (!routerPath.startsWith(basePath)) {
+          // Check if redirect path already has a base path prefix
+          if (!routerPath.startsWith('/Fridge-app/') && !routerPath.startsWith('/fridge-app/')) {
+            // Remove leading slash if present, then prepend base path
+            routerPath = basePath + routerPath.replace(/^\//, '');
+          } else {
+            // Redirect path already has base path, use it as-is
+            // But ensure we use the correct casing
+            if (routerPath.startsWith('/fridge-app/') && basePath === '/Fridge-app/') {
+              routerPath = routerPath.replace('/fridge-app/', '/Fridge-app/');
+            } else if (routerPath.startsWith('/Fridge-app/') && basePath === '/fridge-app/') {
+              routerPath = routerPath.replace('/Fridge-app/', '/fridge-app/');
+            }
+          }
         }
         
         // Ensure router path starts with /
