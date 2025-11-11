@@ -13,18 +13,30 @@
       // Store the full URL path in sessionStorage
       sessionStorage.setItem('githubPagesRedirect', path + search + hash);
       
-      // Always redirect to root index.html
-      // The index.html will handle path restoration
-      window.location.replace('/index.html');
+      // Determine base path from the current URL
+      // If we're accessing from root (/invite/accept), try root first
+      // If we're accessing from subdirectory (/Fridge-app/invite/accept), use that base
+      var basePath = '/';
+      
+      // Check if path contains known subdirectory patterns
+      if (path.startsWith('/Fridge-app/')) {
+        basePath = '/Fridge-app/';
+      } else if (path.startsWith('/fridge-app/')) {
+        basePath = '/fridge-app/';
+      }
+      
+      // Redirect to index.html at the detected base path
+      window.location.replace(basePath + 'index.html');
     </script>
-    <!-- Fallback meta refresh -->
+    <!-- Fallback: try root first, then subdirectory -->
     <meta http-equiv="refresh" content="0; url=/index.html">
   </head>
   <body>
     <p>Redirecting...</p>
     <noscript>
       <p>Please enable JavaScript to use this application.</p>
-      <p><a href="/index.html">Go to home page</a></p>
+      <p><a href="/index.html">Go to home page (root)</a></p>
+      <p><a href="/Fridge-app/index.html">Go to home page (Fridge-app)</a></p>
     </noscript>
   </body>
 </html>
