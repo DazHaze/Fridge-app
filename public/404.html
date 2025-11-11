@@ -13,57 +13,24 @@
       // Store the full URL path in sessionStorage
       sessionStorage.setItem('githubPagesRedirect', path + search + hash);
       
-      // Try to redirect to index.html
-      // First try root, if that fails (404), try /Fridge-app/
-      var triedRoot = false;
-      
-      function tryRedirect(basePath) {
-        var testUrl = basePath + 'index.html';
-        
-        // Use fetch to test if the path exists
-        fetch(testUrl, { method: 'HEAD', cache: 'no-cache' })
-          .then(function(response) {
-            if (response.ok) {
-              // Path exists, redirect there
-              window.location.replace(testUrl);
-            } else {
-              // Path doesn't exist, try next option
-              if (!triedRoot && basePath === '/') {
-                triedRoot = true;
-                tryRedirect('/Fridge-app/');
-              } else if (!triedRoot && basePath === '/Fridge-app/') {
-                triedRoot = true;
-                tryRedirect('/fridge-app/');
-              } else {
-                // Last resort: just redirect to root
-                window.location.replace('/index.html');
-              }
-            }
-          })
-          .catch(function() {
-            // On error, try next option
-            if (!triedRoot && basePath === '/') {
-              triedRoot = true;
-              tryRedirect('/Fridge-app/');
-            } else {
-              // Last resort: redirect to root
-              window.location.replace('/index.html');
-            }
-          });
+      // Determine base path from current location
+      var basePath = '/';
+      if (path.startsWith('/Fridge-app/') || path.startsWith('/fridge-app/')) {
+        var firstSegment = path.split('/')[1];
+        basePath = '/' + firstSegment + '/';
       }
       
-      // Start by trying root
-      tryRedirect('/');
+      // Redirect to index.html at the detected base path
+      window.location.replace(basePath + 'index.html');
     </script>
-    <!-- Fallback: redirect to root -->
-    <meta http-equiv="refresh" content="1; url=/index.html">
+    <!-- Fallback: redirect to /Fridge-app/index.html -->
+    <meta http-equiv="refresh" content="0; url=/Fridge-app/index.html">
   </head>
   <body>
     <p>Redirecting...</p>
     <noscript>
       <p>Please enable JavaScript to use this application.</p>
-      <p><a href="/index.html">Go to home page (root)</a></p>
-      <p><a href="/Fridge-app/index.html">Go to home page (Fridge-app)</a></p>
+      <p><a href="/Fridge-app/index.html">Go to home page</a></p>
     </noscript>
   </body>
 </html>
