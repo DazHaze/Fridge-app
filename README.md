@@ -57,13 +57,32 @@ Deploy the frontend to GitHub Pages. See [DEPLOYMENT.md](./DEPLOYMENT.md) for de
 
 ### 2. Environment Variables
 
-1. Create a `.env` file in the root directory
-2. Add your MongoDB connection string:
+Create a `.env` file in the root directory and add the following variables:
 
 ```
 MONGODB_URI=your_mongodb_atlas_connection_string_here
 PORT=5000
+FRONTEND_URL=http://localhost:5173
+
+# Email (required for invite emails)
+SMTP_HOST=smtp.yourprovider.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=your_smtp_username
+SMTP_PASS=your_smtp_password
+MAIL_FROM="Bia Fridge <invites@yourdomain.com>"
+
+# Optional: override invite expiry (hours)
+INVITE_EXPIRY_HOURS=72
+
+# Gmail shortcut (instead of SMTP_*)
+GMAIL_USER=your_email@gmail.com
+GMAIL_APP_PASSWORD=your_app_password
 ```
+
+- Set `FRONTEND_URL` to the public URL where the React app is served (used to build invite links).
+- The SMTP values must match your email provider. If email cannot be sent, the API will still return a manual invite link that can be shared directly.
+- To send mail from a Gmail account, create an App Password in Google Account settings (requires 2FA) and use `GMAIL_USER` and `GMAIL_APP_PASSWORD`. The invite email will be sent from that Gmail address.
 
 ### 3. Install Dependencies
 
@@ -96,6 +115,7 @@ The API server will be running at `http://localhost:5000`
 - View all items in a list
 - Delete items
 - Data persisted in MongoDB Atlas
+- Invite other users to share the same fridge with real-time syncing of items
 
 ## Project Structure
 

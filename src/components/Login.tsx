@@ -94,7 +94,7 @@ const Login = () => {
     }
 
     // Wait for Google script to load
-    let checkInterval: NodeJS.Timeout | null = null
+    let checkInterval: ReturnType<typeof setInterval> | null = null
     
     if (window.google) {
       initializeGoogleSignIn()

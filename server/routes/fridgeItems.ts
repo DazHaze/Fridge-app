@@ -1,10 +1,11 @@
 import express, { Request, Response } from 'express'
 import mongoose from 'mongoose'
 import FridgeItem from '../models/FridgeItem.js'
+import UserProfile from '../models/UserProfile.js'
+import Fridge from '../models/Fridge.js'
 
 const router = express.Router()
 
-// Helper to check MongoDB connection
 const checkConnection = () => {
   if (mongoose.connection.readyState !== 1) {
     return { connected: false, message: 'Database not connected. Please check your MONGODB_URI in .env file' }
@@ -12,7 +13,34 @@ const checkConnection = () => {
   return { connected: true }
 }
 
-// Get all fridge items for a specific user
+const resolveFridgeContext = async (userId?: string, fridgeId?: string) => {
+  if (fridgeId) {
+    return fridgeId
+  }
+
+  if (!userId) {
+    throw new Error('userId or fridgeId must be provided')
+  }
+
+  const profile = await UserProfile.findOne({ userId })
+  if (!profile) {
+    throw new Error('User profile not found')
+  }
+
+  return profile.fridgeId.toString()
+}
+
+const ensureMembership = async (userId: string, fridgeId: string) => {
+  const fridge = await Fridge.findById(fridgeId)
+  if (!fridge) {
+    throw new Error('Fridge not found')
+  }
+
+  if (!fridge.members.includes(userId)) {
+    throw new Error('User is not a member of this fridge')
+  }
+}
+
 router.get('/', async (req: Request, res: Response) => {
   const connectionCheck = checkConnection()
   if (!connectionCheck.connected) {
@@ -20,13 +48,24 @@ router.get('/', async (req: Request, res: Response) => {
   }
 
   try {
-    const userId = req.query.userId as string
-    
-    if (!userId) {
-      return res.status(400).json({ message: 'userId is required' })
+    const userId = req.query.userId as string | undefined
+    const fridgeIdParam = req.query.fridgeId as string | undefined
+
+    if (!userId && !fridgeIdParam) {
+      return res.status(400).json({ message: 'userId or fridgeId is required' })
     }
 
-    const items = await FridgeItem.find({ userId }).sort({ createdAt: -1 })
+    const fridgeId = await resolveFridgeContext(userId, fridgeIdParam)
+
+    if (userId) {
+      try {
+        await ensureMembership(userId, fridgeId)
+      } catch (membershipError) {
+        return res.status(403).json({ message: (membershipError as Error).message })
+      }
+    }
+
+    const items = await FridgeItem.find({ fridgeId }).sort({ createdAt: -1 })
     res.json(items)
   } catch (error) {
     console.error('Error fetching items:', error)
@@ -34,7 +73,6 @@ router.get('/', async (req: Request, res: Response) => {
   }
 })
 
-// Create a new fridge item
 router.post('/', async (req: Request, res: Response) => {
   const connectionCheck = checkConnection()
   if (!connectionCheck.connected) {
@@ -42,22 +80,39 @@ router.post('/', async (req: Request, res: Response) => {
   }
 
   try {
-    const { name, expiryDate, userId, isOpened, openedDate } = req.body
-    
-    if (!name || !expiryDate || !userId) {
-      return res.status(400).json({ message: 'Name, expiry date, and userId are required' })
+    const { name, expiryDate, userId, fridgeId: fridgeIdInput, isOpened, openedDate } = req.body as {
+      name?: string
+      expiryDate?: string
+      userId?: string
+      fridgeId?: string
+      isOpened?: boolean
+      openedDate?: string
+    }
+
+    if (!name || !expiryDate || (!userId && !fridgeIdInput)) {
+      return res.status(400).json({ message: 'Name, expiry date, and userId or fridgeId are required' })
+    }
+
+    const fridgeId = await resolveFridgeContext(userId, fridgeIdInput)
+
+    if (userId) {
+      try {
+        await ensureMembership(userId, fridgeId)
+      } catch (membershipError) {
+        return res.status(403).json({ message: (membershipError as Error).message })
+      }
     }
 
     const newItem = new FridgeItem({
       name,
       expiryDate: new Date(expiryDate),
-      userId,
+      userId: userId || fridgeId,
+      fridgeId,
       isOpened: isOpened || false,
       openedDate: isOpened && openedDate ? new Date(openedDate) : null
     })
 
     const savedItem = await newItem.save()
-    console.log('Item saved to database:', savedItem)
     res.status(201).json(savedItem)
   } catch (error) {
     console.error('Error saving item to database:', error)
@@ -65,7 +120,6 @@ router.post('/', async (req: Request, res: Response) => {
   }
 })
 
-// Update a fridge item
 router.put('/:id', async (req: Request, res: Response) => {
   const connectionCheck = checkConnection()
   if (!connectionCheck.connected) {
@@ -74,46 +128,52 @@ router.put('/:id', async (req: Request, res: Response) => {
 
   try {
     const { id } = req.params
-    const { name, expiryDate, userId, isOpened, openedDate } = req.body
-    
-    if (!name || !expiryDate || !userId) {
-      return res.status(400).json({ message: 'Name, expiry date, and userId are required' })
+    const { name, expiryDate, userId, fridgeId: fridgeIdInput, isOpened, openedDate } = req.body as {
+      name?: string
+      expiryDate?: string
+      userId?: string
+      fridgeId?: string
+      isOpened?: boolean
+      openedDate?: string
     }
 
-    // Validate MongoDB ObjectId format
+    if (!name || !expiryDate || (!userId && !fridgeIdInput)) {
+      return res.status(400).json({ message: 'Name, expiry date, and userId or fridgeId are required' })
+    }
+
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: 'Invalid item ID format' })
     }
 
-    const updateData: any = {
+    const fridgeId = await resolveFridgeContext(userId, fridgeIdInput)
+
+    if (userId) {
+      try {
+        await ensureMembership(userId, fridgeId)
+      } catch (membershipError) {
+        return res.status(403).json({ message: (membershipError as Error).message })
+      }
+    }
+
+    const updateData: Record<string, unknown> = {
       name,
       expiryDate: new Date(expiryDate),
-      isOpened: isOpened || false
+      isOpened: isOpened || false,
+      fridgeId
     }
 
-    // Set openedDate if item is opened, otherwise clear it
-    if (isOpened && openedDate) {
-      updateData.openedDate = new Date(openedDate)
-    } else {
-      updateData.openedDate = null
-    }
+    updateData.openedDate = isOpened && openedDate ? new Date(openedDate) : null
 
     const updatedItem = await FridgeItem.findOneAndUpdate(
-      { _id: id, userId },
+      { _id: id, fridgeId },
       updateData,
       { new: true, runValidators: true }
     )
-    
+
     if (!updatedItem) {
-      // Check if item exists but belongs to different user
-      const itemExists = await FridgeItem.findById(id)
-      if (itemExists) {
-        return res.status(403).json({ message: 'Item belongs to a different user' })
-      }
-      return res.status(404).json({ message: 'Item not found' })
+      return res.status(404).json({ message: 'Item not found in fridge' })
     }
 
-    console.log('Item updated in database:', updatedItem)
     res.json(updatedItem)
   } catch (error) {
     console.error('Error updating item:', error)
@@ -121,7 +181,6 @@ router.put('/:id', async (req: Request, res: Response) => {
   }
 })
 
-// Delete a fridge item
 router.delete('/:id', async (req: Request, res: Response) => {
   const connectionCheck = checkConnection()
   if (!connectionCheck.connected) {
@@ -130,16 +189,31 @@ router.delete('/:id', async (req: Request, res: Response) => {
 
   try {
     const { id } = req.params
-    const userId = req.query.userId as string
-    
-    if (!userId) {
-      return res.status(400).json({ message: 'userId is required' })
+    const userId = req.query.userId as string | undefined
+    const fridgeIdInput = req.query.fridgeId as string | undefined
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: 'Invalid item ID format' })
     }
-    
-    const deletedItem = await FridgeItem.findOneAndDelete({ _id: id, userId })
-    
+
+    if (!userId && !fridgeIdInput) {
+      return res.status(400).json({ message: 'userId or fridgeId is required' })
+    }
+
+    const fridgeId = await resolveFridgeContext(userId, fridgeIdInput)
+
+    if (userId) {
+      try {
+        await ensureMembership(userId, fridgeId)
+      } catch (membershipError) {
+        return res.status(403).json({ message: (membershipError as Error).message })
+      }
+    }
+
+    const deletedItem = await FridgeItem.findOneAndDelete({ _id: id, fridgeId })
+
     if (!deletedItem) {
-      return res.status(404).json({ message: 'Item not found' })
+      return res.status(404).json({ message: 'Item not found in fridge' })
     }
 
     res.json({ message: 'Item deleted successfully', item: deletedItem })
@@ -149,7 +223,6 @@ router.delete('/:id', async (req: Request, res: Response) => {
   }
 })
 
-// Clear all fridge items for a specific user
 router.delete('/', async (req: Request, res: Response) => {
   const connectionCheck = checkConnection()
   if (!connectionCheck.connected) {
@@ -157,14 +230,24 @@ router.delete('/', async (req: Request, res: Response) => {
   }
 
   try {
-    const userId = req.query.userId as string
-    
-    if (!userId) {
-      return res.status(400).json({ message: 'userId is required' })
+    const userId = req.query.userId as string | undefined
+    const fridgeIdInput = req.query.fridgeId as string | undefined
+
+    if (!userId && !fridgeIdInput) {
+      return res.status(400).json({ message: 'userId or fridgeId is required' })
     }
 
-    const result = await FridgeItem.deleteMany({ userId })
-    console.log(`Cleared ${result.deletedCount} items from database for user ${userId}`)
+    const fridgeId = await resolveFridgeContext(userId, fridgeIdInput)
+
+    if (userId) {
+      try {
+        await ensureMembership(userId, fridgeId)
+      } catch (membershipError) {
+        return res.status(403).json({ message: (membershipError as Error).message })
+      }
+    }
+
+    const result = await FridgeItem.deleteMany({ fridgeId })
     res.json({ message: 'All items cleared successfully', deletedCount: result.deletedCount })
   } catch (error) {
     console.error('Error clearing items:', error)

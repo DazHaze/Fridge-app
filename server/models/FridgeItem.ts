@@ -4,6 +4,7 @@ export interface IFridgeItem extends Document {
   name: string
   expiryDate: Date
   userId: string
+  fridgeId: mongoose.Types.ObjectId | string
   isOpened: boolean
   openedDate?: Date
   createdAt: Date
@@ -23,6 +24,14 @@ const FridgeItemSchema: Schema = new Schema({
     type: String,
     required: true,
     index: true
+  },
+  fridgeId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Fridge',
+    index: true,
+    default: function (this: IFridgeItem) {
+      return this.userId
+    }
   },
   isOpened: {
     type: Boolean,

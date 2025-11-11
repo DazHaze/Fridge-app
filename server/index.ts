@@ -3,6 +3,8 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import mongoose from 'mongoose'
 import fridgeItemRoutes from './routes/fridgeItems.js'
+import fridgeRoutes from './routes/fridges.js'
+import inviteRoutes from './routes/invites.js'
 
 dotenv.config()
 
@@ -40,6 +42,8 @@ app.use(express.json())
 
 // Routes
 app.use('/api/fridge-items', fridgeItemRoutes)
+app.use('/api/fridges', fridgeRoutes)
+app.use('/api/invites', inviteRoutes)
 
 // MongoDB connection
 const connectDB = async () => {

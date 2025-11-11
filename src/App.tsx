@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import './App.css'
 import { getApiUrl } from './config'
 import { useAuth } from './contexts/AuthContext'
 import Login from './components/Login'
+import InviteUser from './components/InviteUser'
+import AcceptInvite from './components/AcceptInvite'
 
 interface FridgeItem {
   _id: string
@@ -14,9 +16,14 @@ interface FridgeItem {
   createdAt?: string
 }
 
-function FridgeApp() {
+interface FridgeAppProps {
+  fridgeId: string
+}
+
+function FridgeApp({ fridgeId }: FridgeAppProps) {
   const { user, logout } = useAuth()
   const userId = user?.sub || ''
+  const navigate = useNavigate()
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isEditFormOpen, setIsEditFormOpen] = useState(false)
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
@@ -27,6 +34,7 @@ function FridgeApp() {
   const [binItems, setBinItems] = useState<FridgeItem[]>([])
   const [loading, setLoading] = useState(true)
   const [deletedCount, setDeletedCount] = useState(0)
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   // Capitalize item name (first letter of each word)
   const capitalizeName = (name: string): string => {
@@ -147,13 +155,18 @@ function FridgeApp() {
   }
 
   const fetchItems = useCallback(async () => {
-    if (!userId) {
+    setLoading(true)
+    if (!userId || !fridgeId) {
       setLoading(false)
       return
     }
     
     try {
-      const response = await fetch(getApiUrl(`fridge-items?userId=${encodeURIComponent(userId)}`))
+      const params = new URLSearchParams({
+        fridgeId: fridgeId,
+        userId: userId
+      })
+      const response = await fetch(getApiUrl(`fridge-items?${params.toString()}`))
       if (response.ok) {
         const data = await response.json()
         const { active, expired } = separateItems(data)
@@ -165,14 +178,14 @@ function FridgeApp() {
     } finally {
       setLoading(false)
     }
-  }, [userId])
+  }, [userId, fridgeId])
 
   // Fetch items from API on component mount and when userId changes
   useEffect(() => {
-    if (userId) {
+    if (userId && fridgeId) {
       fetchItems()
     }
-  }, [userId, fetchItems])
+  }, [userId, fridgeId, fetchItems])
 
   const handlePlusClick = () => {
     setIsFormOpen(true)
@@ -211,12 +224,21 @@ function FridgeApp() {
   const handleUpdateItem = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingItemId) return
+    if (!fridgeId) {
+      alert('Fridge not ready. Please try again in a moment.')
+      return
+    }
+    if (!userId) {
+      alert('You must be signed in to update items.')
+      return
+    }
 
     try {
       const updateData: any = {
         name: capitalizeName(itemName.trim()),
         expiryDate: expiryDate,
         userId: userId,
+        fridgeId: fridgeId,
         isOpened: isOpened
       }
       
@@ -234,7 +256,11 @@ function FridgeApp() {
         updateData.openedDate = null
       }
       
-      const response = await fetch(getApiUrl(`fridge-items/${editingItemId}?userId=${encodeURIComponent(userId)}`), {
+      const params = new URLSearchParams({
+        fridgeId,
+        userId
+      })
+      const response = await fetch(getApiUrl(`fridge-items/${editingItemId}?${params.toString()}`), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -279,6 +305,14 @@ function FridgeApp() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!fridgeId) {
+      alert('Fridge not ready. Please try again in a moment.')
+      return
+    }
+    if (!userId) {
+      alert('You must be signed in to add items.')
+      return
+    }
     try {
       const response = await fetch(getApiUrl('fridge-items'), {
         method: 'POST',
@@ -288,7 +322,8 @@ function FridgeApp() {
         body: JSON.stringify({
           name: capitalizeName(itemName.trim()),
           expiryDate: expiryDate,
-          userId: userId
+          userId: userId,
+          fridgeId: fridgeId
         })
       })
 
@@ -327,8 +362,20 @@ function FridgeApp() {
   }
 
   const handleDeleteItem = async (id: string) => {
+    if (!fridgeId) {
+      alert('Fridge not ready. Please try again in a moment.')
+      return
+    }
+    if (!userId) {
+      alert('You must be signed in to delete items.')
+      return
+    }
     try {
-      const response = await fetch(getApiUrl(`fridge-items/${id}?userId=${encodeURIComponent(userId)}`), {
+      const params = new URLSearchParams({
+        fridgeId,
+        userId
+      })
+      const response = await fetch(getApiUrl(`fridge-items/${id}?${params.toString()}`), {
         method: 'DELETE'
       })
 
@@ -353,12 +400,24 @@ function FridgeApp() {
   }
 
   const handleClearFridge = async () => {
+    if (!fridgeId) {
+      alert('Fridge not ready. Please try again in a moment.')
+      return
+    }
+    if (!userId) {
+      alert('You must be signed in to clear the fridge.')
+      return
+    }
     if (!window.confirm('Are you sure you want to clear all items from the fridge? This cannot be undone.')) {
       return
     }
 
     try {
-      const response = await fetch(getApiUrl(`fridge-items?userId=${encodeURIComponent(userId)}`), {
+      const params = new URLSearchParams({
+        fridgeId,
+        userId
+      })
+      const response = await fetch(getApiUrl(`fridge-items?${params.toString()}`), {
         method: 'DELETE'
       })
 
@@ -387,84 +446,235 @@ function FridgeApp() {
     }
   }
 
+  const handleInviteUser = () => {
+    setIsMenuOpen(false)
+    navigate('/invite')
+  }
+
   return (
-    <div 
-      className="App"
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'flex-start',
-        width: '100%',
-        minHeight: '100vh',
-        margin: 0,
-        padding: '16px',
-        gap: '16px',
-        overflowY: 'auto',
-        paddingBottom: '24px',
-        backgroundColor: '#f5f5f5'
-      }}
-    >
-      {/* User info and logout button */}
-      <div
+    <>
+      {/* Navigation Menu */}
+      <nav
         style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '56px',
+          backgroundColor: '#ffffff',
+          boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.2), 0 4px 5px 0 rgba(0, 0, 0, 0.14), 0 1px 10px 0 rgba(0, 0, 0, 0.12)',
           display: 'flex',
           alignItems: 'center',
-          gap: '12px',
-          backgroundColor: '#ffffff',
-          padding: '8px 16px',
-          borderRadius: '24px',
-          boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.2), 0 4px 5px 0 rgba(0, 0, 0, 0.14), 0 1px 10px 0 rgba(0, 0, 0, 0.12)',
-          marginBottom: '8px'
+          justifyContent: 'space-between',
+          padding: '0 16px',
+          zIndex: 1000
         }}
       >
-        {user?.picture && (
-          <img
-            src={user.picture}
-            alt={user.name}
-            style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '50%'
-            }}
-          />
-        )}
-        <span
+        <h1
           style={{
             color: 'rgba(0, 0, 0, 0.87)',
-            fontSize: '14px',
-            fontWeight: '500'
+            fontSize: '20px',
+            fontWeight: '500',
+            margin: 0,
+            letterSpacing: '0.15px'
           }}
         >
-          {user?.name}
-        </span>
+          Bia
+        </h1>
+        
         <button
-          onClick={logout}
+          onClick={() => setIsMenuOpen(!isMenuOpen)}
           style={{
-            padding: '6px 12px',
             backgroundColor: 'transparent',
-            color: '#d32f2f',
-            border: '1px solid #d32f2f',
-            borderRadius: '4px',
+            border: 'none',
             cursor: 'pointer',
-            fontSize: '12px',
-            fontWeight: '500',
-            textTransform: 'uppercase',
-            letterSpacing: '0.5px',
-            transition: 'all 0.2s ease'
+            padding: '8px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minWidth: '40px',
+            minHeight: '40px',
+            borderRadius: '50%',
+            transition: 'background-color 0.2s ease',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent'
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#d32f2f'
-            e.currentTarget.style.color = '#ffffff'
+            e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.08)'
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.backgroundColor = 'transparent'
-            e.currentTarget.style.color = '#d32f2f'
           }}
+          aria-label="Menu"
         >
-          Logout
+          <div
+            style={{
+              width: '24px',
+              height: '2px',
+              backgroundColor: 'rgba(0, 0, 0, 0.87)',
+              transition: 'all 0.3s ease',
+              transform: isMenuOpen ? 'rotate(45deg) translate(5px, 5px)' : 'none'
+            }}
+          />
+          <div
+            style={{
+              width: '24px',
+              height: '2px',
+              backgroundColor: 'rgba(0, 0, 0, 0.87)',
+              transition: 'all 0.3s ease',
+              opacity: isMenuOpen ? 0 : 1
+            }}
+          />
+          <div
+            style={{
+              width: '24px',
+              height: '2px',
+              backgroundColor: 'rgba(0, 0, 0, 0.87)',
+              transition: 'all 0.3s ease',
+              transform: isMenuOpen ? 'rotate(-45deg) translate(5px, -5px)' : 'none'
+            }}
+          />
         </button>
-      </div>
+      </nav>
+
+      {/* Menu Dropdown */}
+      {isMenuOpen && (
+        <>
+          <div
+            onClick={() => setIsMenuOpen(false)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              zIndex: 1001,
+              backdropFilter: 'blur(2px)'
+            }}
+          />
+          <div
+            style={{
+              position: 'fixed',
+              top: '56px',
+              right: '16px',
+              backgroundColor: '#ffffff',
+              borderRadius: '4px',
+              boxShadow: '0 8px 10px 1px rgba(0, 0, 0, 0.14), 0 3px 14px 2px rgba(0, 0, 0, 0.12), 0 5px 5px -3px rgba(0, 0, 0, 0.2)',
+              minWidth: '200px',
+              zIndex: 1002,
+              padding: '8px 0',
+              display: 'flex',
+              flexDirection: 'column'
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '12px 16px',
+                borderBottom: '1px solid rgba(0, 0, 0, 0.12)'
+              }}
+            >
+              {user?.picture && (
+                <img
+                  src={user.picture}
+                  alt={user.name}
+                  style={{
+                    width: '40px',
+                    height: '40px',
+                    borderRadius: '50%'
+                  }}
+                />
+              )}
+              <span
+                style={{
+                  color: 'rgba(0, 0, 0, 0.87)',
+                  fontSize: '16px',
+                  fontWeight: '500',
+                  flex: 1
+                }}
+              >
+                {user?.name}
+              </span>
+            </div>
+          <button
+            onClick={handleInviteUser}
+            style={{
+              padding: '12px 16px',
+              backgroundColor: 'transparent',
+              color: '#6200ee',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: '500',
+              textAlign: 'left',
+              transition: 'background-color 0.2s ease',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(98, 0, 238, 0.08)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent'
+            }}
+            aria-label="Invite user to fridge"
+          >
+            Invite User to Fridge
+          </button>
+            <button
+              onClick={() => {
+                setIsMenuOpen(false)
+                logout()
+              }}
+              style={{
+                padding: '12px 16px',
+                backgroundColor: 'transparent',
+                color: '#d32f2f',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: '500',
+                textAlign: 'left',
+                transition: 'background-color 0.2s ease',
+                touchAction: 'manipulation',
+                WebkitTapHighlightColor: 'transparent'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(211, 47, 47, 0.08)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent'
+              }}
+            >
+              Logout
+            </button>
+          </div>
+        </>
+      )}
+      
+      <div 
+        className="App"
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'flex-start',
+          width: '100%',
+          minHeight: '100vh',
+          margin: 0,
+          padding: '16px',
+          paddingTop: '72px',
+          gap: '16px',
+          overflowY: 'auto',
+          paddingBottom: '24px',
+          backgroundColor: '#f5f5f5'
+        }}
+      >
       <div 
         className="fridge-items"
         style={{
@@ -1366,33 +1576,108 @@ function FridgeApp() {
         Clear Fridge
       </button>
     </div>
+    </>
+  )
+}
+
+function LoadingScreen({ message }: { message: string }) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        backgroundColor: '#f5f5f5'
+      }}
+    >
+      <p style={{ color: 'rgba(0, 0, 0, 0.6)', fontSize: '16px' }}>{message}</p>
+    </div>
   )
 }
 
 function App() {
-  const { isAuthenticated, loading } = useAuth()
+  const { isAuthenticated, loading, user } = useAuth()
+  const [fridgeId, setFridgeId] = useState<string | null>(null)
+
+  const ensureFridge = useCallback(async (): Promise<string | null> => {
+    if (!user?.sub) {
+      setFridgeId(null)
+      return null
+    }
+
+    try {
+      const response = await fetch(getApiUrl('fridges/ensure'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userId: user.sub,
+          email: user.email,
+          name: user.name
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setFridgeId(data.fridgeId)
+        return data.fridgeId
+      } else {
+        console.error('Failed to ensure fridge:', response.status)
+      }
+    } catch (error) {
+      console.error('Error ensuring fridge:', error)
+    }
+
+    return null
+  }, [user?.sub, user?.email, user?.name])
+
+  useEffect(() => {
+    if (isAuthenticated && user?.sub) {
+      ensureFridge()
+    } else {
+      setFridgeId(null)
+    }
+  }, [isAuthenticated, user?.sub, ensureFridge])
 
   if (loading) {
-    return (
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          minHeight: '100vh',
-          backgroundColor: '#f5f5f5'
-        }}
-      >
-        <p style={{ color: 'rgba(0, 0, 0, 0.6)', fontSize: '16px' }}>Loading...</p>
-      </div>
-    )
+    return <LoadingScreen message="Loading..." />
   }
+
+  const fridgeReady = !!fridgeId
+  const renderFridgeLoading = <LoadingScreen message="Preparing your fridge..." />
 
   return (
     <Routes>
       <Route
         path="/"
-        element={isAuthenticated ? <FridgeApp /> : <Navigate to="/login" replace />}
+        element={
+          isAuthenticated
+            ? fridgeReady
+              ? <FridgeApp fridgeId={fridgeId} />
+              : renderFridgeLoading
+            : <Navigate to="/login" replace />
+        }
+      />
+      <Route
+        path="/invite"
+        element={
+          isAuthenticated
+            ? fridgeReady
+              ? <InviteUser fridgeId={fridgeId} />
+              : renderFridgeLoading
+            : <Navigate to="/login" replace />
+        }
+      />
+      <Route
+        path="/invite/accept"
+        element={
+          <AcceptInvite
+            isAuthenticated={isAuthenticated}
+            ensureFridge={ensureFridge}
+          />
+        }
       />
       <Route
         path="/login"
