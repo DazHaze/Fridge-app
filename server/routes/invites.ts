@@ -86,19 +86,27 @@ router.post('/', async (req: Request, res: Response) => {
     const acceptLink = `${baseUrl.replace(/\/+$/, '')}/invite/accept?token=${token}`
 
     if (transporter) {
-      const fromAddress =
-        inviterProfile.email ||
-        process.env.MAIL_FROM ||
-        process.env.SMTP_USER ||
-        process.env.GMAIL_USER ||
-        'no-reply@bia.app'
+      // For Gmail, the "from" address must match the authenticated account
+      // For SMTP, use the inviter's email or configured address
+      const fromAddress = process.env.GMAIL_USER
+        ? process.env.GMAIL_USER
+        : inviterProfile.email ||
+          process.env.MAIL_FROM ||
+          process.env.SMTP_USER ||
+          'no-reply@bia.app'
+      
+      const fromName = inviterProfile.name || 'Bia Fridge'
+      const displayFrom = process.env.GMAIL_USER
+        ? `${fromName} <${fromAddress}>`
+        : fromAddress
+      
       try {
         await transporter.sendMail({
-          from: fromAddress,
+          from: displayFrom,
           to: inviteeEmail,
           subject: 'Bia Fridge Invitation',
           html: `
-            <p>You have been invited to share a fridge on Bia.</p>
+            <p>You have been invited to share a fridge on Bia by ${inviterProfile.name || 'a user'}.</p>
             <p>Click the link below to join:</p>
             <p><a href="${acceptLink}">${acceptLink}</a></p>
             <p>This invitation will expire in ${expiryHours} hours.</p>
