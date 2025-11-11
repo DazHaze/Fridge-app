@@ -39,13 +39,8 @@
           }
           
           // Immediately replace the URL before React Router loads
-          // Use replaceState to avoid adding to history
+          // Use replaceState to avoid adding to history and prevent reload
           window.history.replaceState(null, '', routerPath);
-          
-          // Also update location.pathname directly as a fallback
-          if (window.location.pathname !== routerPath.split('?')[0]) {
-            window.location.replace(routerPath);
-          }
         }
       })();
     </script>
