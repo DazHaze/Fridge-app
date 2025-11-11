@@ -13,23 +13,50 @@
       // Store the full URL path in sessionStorage
       sessionStorage.setItem('githubPagesRedirect', path + search + hash);
       
-      // Determine base path from the current URL
-      // If we're accessing from root (/invite/accept), try root first
-      // If we're accessing from subdirectory (/Fridge-app/invite/accept), use that base
-      var basePath = '/';
+      // Try to redirect to index.html
+      // First try root, if that fails (404), try /Fridge-app/
+      var triedRoot = false;
       
-      // Check if path contains known subdirectory patterns
-      if (path.startsWith('/Fridge-app/')) {
-        basePath = '/Fridge-app/';
-      } else if (path.startsWith('/fridge-app/')) {
-        basePath = '/fridge-app/';
+      function tryRedirect(basePath) {
+        var testUrl = basePath + 'index.html';
+        
+        // Use fetch to test if the path exists
+        fetch(testUrl, { method: 'HEAD', cache: 'no-cache' })
+          .then(function(response) {
+            if (response.ok) {
+              // Path exists, redirect there
+              window.location.replace(testUrl);
+            } else {
+              // Path doesn't exist, try next option
+              if (!triedRoot && basePath === '/') {
+                triedRoot = true;
+                tryRedirect('/Fridge-app/');
+              } else if (!triedRoot && basePath === '/Fridge-app/') {
+                triedRoot = true;
+                tryRedirect('/fridge-app/');
+              } else {
+                // Last resort: just redirect to root
+                window.location.replace('/index.html');
+              }
+            }
+          })
+          .catch(function() {
+            // On error, try next option
+            if (!triedRoot && basePath === '/') {
+              triedRoot = true;
+              tryRedirect('/Fridge-app/');
+            } else {
+              // Last resort: redirect to root
+              window.location.replace('/index.html');
+            }
+          });
       }
       
-      // Redirect to index.html at the detected base path
-      window.location.replace(basePath + 'index.html');
+      // Start by trying root
+      tryRedirect('/');
     </script>
-    <!-- Fallback: try root first, then subdirectory -->
-    <meta http-equiv="refresh" content="0; url=/index.html">
+    <!-- Fallback: redirect to root -->
+    <meta http-equiv="refresh" content="1; url=/index.html">
   </head>
   <body>
     <p>Redirecting...</p>
