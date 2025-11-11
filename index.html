@@ -34,20 +34,19 @@
         // Restore the path - ensure it includes the base path
         var routerPath = redirectPath;
         
-        // If redirect path doesn't start with base path, prepend it
-        if (!routerPath.startsWith(basePath)) {
-          // Check if redirect path already has a base path prefix
-          if (!routerPath.startsWith('/Fridge-app/') && !routerPath.startsWith('/fridge-app/')) {
-            // Remove leading slash if present, then prepend base path
-            routerPath = basePath + routerPath.replace(/^\//, '');
-          } else {
-            // Redirect path already has base path, use it as-is
-            // But ensure we use the correct casing
-            if (routerPath.startsWith('/fridge-app/') && basePath === '/Fridge-app/') {
-              routerPath = routerPath.replace('/fridge-app/', '/Fridge-app/');
-            } else if (routerPath.startsWith('/Fridge-app/') && basePath === '/fridge-app/') {
-              routerPath = routerPath.replace('/Fridge-app/', '/fridge-app/');
-            }
+        // Always ensure the path includes the base path
+        // Check if redirect path already has a base path prefix
+        var hasBasePath = routerPath.startsWith('/Fridge-app/') || routerPath.startsWith('/fridge-app/');
+        
+        if (!hasBasePath) {
+          // Path doesn't have base path, prepend it
+          routerPath = basePath + routerPath.replace(/^\//, '');
+        } else {
+          // Path already has base path, ensure correct casing matches basePath
+          if (routerPath.startsWith('/fridge-app/') && basePath === '/Fridge-app/') {
+            routerPath = routerPath.replace('/fridge-app/', '/Fridge-app/');
+          } else if (routerPath.startsWith('/Fridge-app/') && basePath === '/fridge-app/') {
+            routerPath = routerPath.replace('/Fridge-app/', '/fridge-app/');
           }
         }
         
