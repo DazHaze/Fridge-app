@@ -4,17 +4,23 @@
     <meta charset="utf-8">
     <title>Redirecting...</title>
     <script>
-      // Redirect to index.html, preserving the full path in the URL
-      // We'll restore it before React Router loads
+      // GitHub Pages SPA redirect
+      // Store the original path and redirect to index.html
       var path = window.location.pathname;
       var search = window.location.search;
       var hash = window.location.hash;
       
-      // Store the original path in sessionStorage
+      // Store in sessionStorage for index.html to restore
       sessionStorage.setItem('githubPagesRedirect', path + search + hash);
       
+      // Determine base path - check if we're in a subdirectory
+      var basePath = '/';
+      if (path.startsWith('/fridge-app/') || path.startsWith('/Fridge-app/')) {
+        basePath = path.split('/').slice(0, 2).join('/') + '/';
+      }
+      
       // Redirect to index.html
-      window.location.replace('/index.html');
+      window.location.replace(basePath + 'index.html');
     </script>
   </head>
   <body>

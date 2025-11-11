@@ -83,6 +83,45 @@ router.post('/ensure', async (req: Request, res: Response) => {
   }
 })
 
+router.get('/user/:userId', async (req: Request, res: Response) => {
+  const connectionCheck = ensureMongoConnected()
+  if (!connectionCheck.connected) {
+    return res.status(503).json({ message: connectionCheck.message })
+  }
+
+  try {
+    const { userId } = req.params
+
+    if (!userId) {
+      return res.status(400).json({ message: 'userId is required' })
+    }
+
+    // Find all fridges where the user is a member
+    const fridges = await Fridge.find({ members: userId }).select('_id name members createdAt')
+
+    // Get user's profile to identify their personal fridge
+    const profile = await UserProfile.findOne({ userId })
+    const personalFridgeId = profile?.fridgeId?.toString()
+
+    // Format response with personal fridge marked
+    const formattedFridges = fridges.map(fridge => {
+      const fridgeId = fridge._id as mongoose.Types.ObjectId
+      return {
+        fridgeId: fridgeId.toString(),
+        name: fridge.name || 'Shared Fridge',
+        members: fridge.members,
+        isPersonal: fridgeId.toString() === personalFridgeId,
+        createdAt: fridge.createdAt
+      }
+    })
+
+    res.json({ fridges: formattedFridges })
+  } catch (error) {
+    console.error('Error fetching user fridges:', error)
+    res.status(500).json({ message: 'Error fetching user fridges', error: String(error) })
+  }
+})
+
 export default router
 
 

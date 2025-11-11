@@ -6,9 +6,10 @@ import { getApiUrl } from '../config'
 interface AcceptInviteProps {
   isAuthenticated: boolean
   ensureFridge: () => Promise<string | null>
+  onAccept?: (fridgeId: string) => void
 }
 
-const AcceptInvite = ({ isAuthenticated, ensureFridge }: AcceptInviteProps) => {
+const AcceptInvite = ({ isAuthenticated, ensureFridge, onAccept }: AcceptInviteProps) => {
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token')
   const navigate = useNavigate()
@@ -42,8 +43,12 @@ const AcceptInvite = ({ isAuthenticated, ensureFridge }: AcceptInviteProps) => {
 
       if (response.ok) {
         setStatus('success')
+        const acceptedFridgeId = data?.fridgeId
         setMessage('Invite accepted successfully! Redirecting to your shared fridge...')
         await ensureFridge()
+        if (acceptedFridgeId && onAccept) {
+          onAccept(acceptedFridgeId)
+        }
         setTimeout(() => {
           navigate('/', { replace: true })
         }, 1500)
@@ -56,7 +61,7 @@ const AcceptInvite = ({ isAuthenticated, ensureFridge }: AcceptInviteProps) => {
       setStatus('error')
       setMessage('An unexpected error occurred. Please try again later.')
     }
-  }, [token, user?.sub, user?.email, user?.name, ensureFridge, navigate])
+  }, [token, user?.sub, user?.email, user?.name, ensureFridge, navigate, onAccept])
 
   useEffect(() => {
     if (!token) {

@@ -10,10 +10,19 @@
       // Restore path from GitHub Pages 404 redirect
       // This must run before React Router initializes
       var redirectPath = sessionStorage.getItem('githubPagesRedirect');
-      if (redirectPath && window.location.pathname === '/index.html') {
+      if (redirectPath) {
         sessionStorage.removeItem('githubPagesRedirect');
+        // Determine base path
+        var basePath = '/';
+        if (redirectPath.startsWith('/fridge-app/') || redirectPath.startsWith('/Fridge-app/')) {
+          basePath = redirectPath.split('/').slice(0, 2).join('/') + '/';
+        }
+        // Remove base path from redirect path for React Router
+        var routerPath = redirectPath.startsWith(basePath) 
+          ? redirectPath.slice(basePath.length - 1) 
+          : redirectPath;
         // Replace the current history entry with the original path
-        window.history.replaceState(null, '', redirectPath);
+        window.history.replaceState(null, '', routerPath);
       }
     </script>
   </head>

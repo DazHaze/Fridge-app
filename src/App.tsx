@@ -18,9 +18,11 @@ interface FridgeItem {
 
 interface FridgeAppProps {
   fridgeId: string
+  allFridges: Array<{ fridgeId: string; name: string; isPersonal: boolean }>
+  onFridgeChange: (fridgeId: string) => void
 }
 
-function FridgeApp({ fridgeId }: FridgeAppProps) {
+function FridgeApp({ fridgeId, allFridges, onFridgeChange }: FridgeAppProps) {
   const { user, logout } = useAuth()
   const userId = user?.sub || ''
   const navigate = useNavigate()
@@ -539,6 +541,60 @@ function FridgeApp({ fridgeId }: FridgeAppProps) {
         </button>
       </nav>
 
+      {/* Fridge Tabs */}
+      {allFridges.length > 1 && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '56px',
+            left: 0,
+            right: 0,
+            backgroundColor: '#f5f5f5',
+            borderBottom: '1px solid rgba(0, 0, 0, 0.12)',
+            display: 'flex',
+            gap: '8px',
+            padding: '8px 16px',
+            overflowX: 'auto',
+            zIndex: 999
+          }}
+        >
+          {allFridges.map((fridge) => {
+            const isActive = fridge.fridgeId === fridgeId
+            return (
+              <button
+                key={fridge.fridgeId}
+                onClick={() => onFridgeChange(fridge.fridgeId)}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: isActive ? '#6200ee' : 'transparent',
+                  color: isActive ? '#ffffff' : 'rgba(0, 0, 0, 0.87)',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: isActive ? '500' : '400',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.2s ease',
+                  boxShadow: isActive ? '0 2px 4px -1px rgba(0, 0, 0, 0.2)' : 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.08)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.backgroundColor = 'transparent'
+                  }
+                }}
+              >
+                {fridge.isPersonal ? `${user?.name || 'My'} Fridge` : fridge.name}
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       {/* Menu Dropdown */}
       {isMenuOpen && (
         <>
@@ -668,7 +724,7 @@ function FridgeApp({ fridgeId }: FridgeAppProps) {
           minHeight: '100vh',
           margin: 0,
           padding: '16px',
-          paddingTop: '72px',
+          paddingTop: allFridges.length > 1 ? '104px' : '72px',
           gap: '16px',
           overflowY: 'auto',
           paddingBottom: '24px',
@@ -1599,6 +1655,8 @@ function LoadingScreen({ message }: { message: string }) {
 function App() {
   const { isAuthenticated, loading, user } = useAuth()
   const [fridgeId, setFridgeId] = useState<string | null>(null)
+  const [selectedFridgeId, setSelectedFridgeId] = useState<string | null>(null)
+  const [allFridges, setAllFridges] = useState<Array<{ fridgeId: string; name: string; isPersonal: boolean }>>([])
 
   const ensureFridge = useCallback(async (): Promise<string | null> => {
     if (!user?.sub) {
@@ -1633,19 +1691,44 @@ function App() {
     return null
   }, [user?.sub, user?.email, user?.name])
 
+  const fetchAllFridges = useCallback(async () => {
+    if (!user?.sub) return
+
+    try {
+      const response = await fetch(getApiUrl(`fridges/user/${user.sub}`))
+      if (response.ok) {
+        const data = await response.json()
+        setAllFridges(data.fridges || [])
+        // Set selected fridge to personal fridge if available, otherwise first fridge
+        setSelectedFridgeId((current) => {
+          if (current) return current // Don't change if already set
+          const personalFridge = data.fridges?.find((f: { isPersonal: boolean }) => f.isPersonal)
+          const firstFridge = data.fridges?.[0]
+          return personalFridge?.fridgeId || firstFridge?.fridgeId || null
+        })
+      }
+    } catch (error) {
+      console.error('Error fetching fridges:', error)
+    }
+  }, [user?.sub])
+
   useEffect(() => {
     if (isAuthenticated && user?.sub) {
-      ensureFridge()
+      ensureFridge().then(() => {
+        fetchAllFridges()
+      })
     } else {
       setFridgeId(null)
+      setSelectedFridgeId(null)
+      setAllFridges([])
     }
-  }, [isAuthenticated, user?.sub, ensureFridge])
+  }, [isAuthenticated, user?.sub, ensureFridge, fetchAllFridges])
 
   if (loading) {
     return <LoadingScreen message="Loading..." />
   }
 
-  const fridgeReady = !!fridgeId
+  const fridgeReady = !!fridgeId && !!selectedFridgeId
   const renderFridgeLoading = <LoadingScreen message="Preparing your fridge..." />
 
   return (
@@ -1655,7 +1738,11 @@ function App() {
         element={
           isAuthenticated
             ? fridgeReady
-              ? <FridgeApp fridgeId={fridgeId} />
+              ? <FridgeApp 
+                  fridgeId={selectedFridgeId} 
+                  allFridges={allFridges}
+                  onFridgeChange={setSelectedFridgeId}
+                />
               : renderFridgeLoading
             : <Navigate to="/login" replace />
         }
@@ -1665,7 +1752,7 @@ function App() {
         element={
           isAuthenticated
             ? fridgeReady
-              ? <InviteUser fridgeId={fridgeId} />
+              ? <InviteUser fridgeId={selectedFridgeId || fridgeId || ''} />
               : renderFridgeLoading
             : <Navigate to="/login" replace />
         }
@@ -1676,6 +1763,10 @@ function App() {
           <AcceptInvite
             isAuthenticated={isAuthenticated}
             ensureFridge={ensureFridge}
+            onAccept={(acceptedFridgeId) => {
+              setSelectedFridgeId(acceptedFridgeId)
+              fetchAllFridges()
+            }}
           />
         }
       />
