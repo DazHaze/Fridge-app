@@ -54,7 +54,7 @@ router.post('/', async (req: Request, res: Response) => {
   }
 
   try {
-    const { inviterId, inviteeEmail } = req.body as { inviterId?: string; inviteeEmail?: string }
+    const { inviterId, inviteeEmail, fridgeName } = req.body as { inviterId?: string; inviteeEmail?: string; fridgeName?: string }
 
     if (!inviterId || !inviteeEmail) {
       return res.status(400).json({ message: 'inviterId and inviteeEmail are required' })
@@ -65,9 +65,29 @@ router.post('/', async (req: Request, res: Response) => {
       return res.status(404).json({ message: 'Inviter profile not found' })
     }
 
-    const fridge = await Fridge.findById(inviterProfile.fridgeId)
+    let fridge = await Fridge.findById(inviterProfile.fridgeId)
     if (!fridge) {
       return res.status(404).json({ message: 'Fridge not found for inviter' })
+    }
+
+    // If fridgeName is provided, create a new shared fridge
+    if (fridgeName && fridgeName.trim()) {
+      const oldFridgeId = inviterProfile.fridgeId
+      const newFridge = await Fridge.create({
+        members: [inviterId],
+        name: fridgeName.trim()
+      })
+      fridge = newFridge
+      
+      // Move inviter's items to the new fridge
+      await FridgeItem.updateMany(
+        { fridgeId: oldFridgeId },
+        { fridgeId: newFridge._id }
+      )
+      
+      // Update inviter's profile to point to the new shared fridge
+      inviterProfile.fridgeId = newFridge._id
+      await inviterProfile.save()
     }
 
     const token = crypto.randomUUID()
@@ -107,12 +127,13 @@ router.post('/', async (req: Request, res: Response) => {
         : fromAddress
       
       try {
+        const fridgeDisplayName = fridge.name || 'a fridge'
         await transporter.sendMail({
           from: displayFrom,
           to: inviteeEmail,
           subject: 'Bia Fridge Invitation',
           html: `
-            <p>You have been invited to share a fridge on Bia by ${inviterProfile.name || 'a user'}.</p>
+            <p>You have been invited to share "${fridgeDisplayName}" on Bia by ${inviterProfile.name || 'a user'}.</p>
             <p>Click the link below to join:</p>
             <p><a href="${acceptLink}">${acceptLink}</a></p>
             <p>This invitation will expire in ${expiryHours} hours.</p>

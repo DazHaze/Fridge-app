@@ -58,7 +58,7 @@ const Login = () => {
       return
     }
 
-    const handleCredentialResponse = (response: { credential: string }) => {
+    const handleCredentialResponse = async (response: { credential: string }) => {
       // Decode the JWT token to get user info
       try {
         const base64Url = response.credential.split('.')[1]
@@ -71,6 +71,22 @@ const Login = () => {
         )
 
         const userData = JSON.parse(jsonPayload)
+        
+        // Check if email exists in User model (email/password accounts)
+        try {
+          const checkResponse = await fetch(getApiUrl(`auth/check-email/${encodeURIComponent(userData.email)}`))
+          const checkData = await checkResponse.json()
+          
+          if (checkData.exists && !checkData.hasGmailAccount) {
+            // Email exists but is not a Gmail account - it's an email/password account
+            alert('This email is already registered with an email/password account. Please sign in with your password instead.')
+            return
+          }
+        } catch (checkError) {
+          console.error('Error checking email:', checkError)
+          // Continue with Google login if check fails
+        }
+        
         login({
           name: userData.name,
           email: userData.email,

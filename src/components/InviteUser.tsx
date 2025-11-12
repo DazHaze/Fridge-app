@@ -11,6 +11,7 @@ const InviteUser = ({ fridgeId }: InviteUserProps) => {
   const { user } = useAuth()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
+  const [fridgeName, setFridgeName] = useState('')
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [message, setMessage] = useState<string | null>(null)
   const [inviteLink, setInviteLink] = useState<string | null>(null)
@@ -42,7 +43,8 @@ const InviteUser = ({ fridgeId }: InviteUserProps) => {
         body: JSON.stringify({
           inviterId: user.sub,
           inviteeEmail: email,
-          fridgeId
+          fridgeId,
+          fridgeName: fridgeName.trim() || undefined
         })
       })
 
@@ -55,6 +57,7 @@ const InviteUser = ({ fridgeId }: InviteUserProps) => {
           setInviteLink(data.acceptLink)
         }
         setEmail('')
+        setFridgeName('')
       } else {
         setStatus('error')
         setMessage(data?.message || 'Failed to send invitation. Please try again.')
@@ -138,6 +141,42 @@ const InviteUser = ({ fridgeId }: InviteUserProps) => {
         </p>
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <label
+            htmlFor="invite-fridge-name"
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+              color: 'rgba(0, 0, 0, 0.87)',
+              fontWeight: '500',
+              fontSize: '14px'
+            }}
+          >
+            Shared Fridge Name (optional)
+            <input
+              id="invite-fridge-name"
+              type="text"
+              value={fridgeName}
+              onChange={(event) => setFridgeName(event.target.value)}
+              placeholder="e.g., Family Fridge, Roommate Fridge"
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                border: '1px solid rgba(0, 0, 0, 0.23)',
+                borderRadius: '4px',
+                fontSize: '16px',
+                boxSizing: 'border-box',
+                outline: 'none'
+              }}
+              onFocus={(event) => {
+                event.currentTarget.style.borderColor = '#6200ee'
+              }}
+              onBlur={(event) => {
+                event.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.23)'
+              }}
+            />
+          </label>
+
           <label
             htmlFor="invite-email"
             style={{
