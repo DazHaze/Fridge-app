@@ -66,6 +66,12 @@ router.get('/', async (req: Request, res: Response) => {
     }
 
     const items = await FridgeItem.find({ fridgeId }).sort({ createdAt: -1 })
+    
+    // Set cache-control headers to prevent caching
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+    res.setHeader('Pragma', 'no-cache')
+    res.setHeader('Expires', '0')
+    
     res.json(items)
   } catch (error) {
     console.error('Error fetching items:', error)

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import './App.css'
 import { getApiUrl } from './config'
 import { useAuth } from './contexts/AuthContext'
@@ -20,9 +20,10 @@ interface FridgeAppProps {
   fridgeId: string
   allFridges: Array<{ fridgeId: string; name: string; isPersonal: boolean }>
   onFridgeChange: (fridgeId: string) => void
+  onRefreshFridges?: () => void
 }
 
-function FridgeApp({ fridgeId, allFridges, onFridgeChange }: FridgeAppProps) {
+function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: FridgeAppProps) {
   const { user, logout } = useAuth()
   const userId = user?.sub || ''
   const navigate = useNavigate()
@@ -182,12 +183,26 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange }: FridgeAppProps) {
     }
   }, [userId, fridgeId])
 
-  // Fetch items from API on component mount and when userId changes
+  // Fetch items from API on component mount and when userId or fridgeId changes
   useEffect(() => {
     if (userId && fridgeId) {
+      // Clear items when switching fridges to avoid showing stale data
+      setItems([])
+      setBinItems([])
       fetchItems()
     }
   }, [userId, fridgeId, fetchItems])
+
+  // Refresh fridge list when window regains focus (in case fridges were added elsewhere)
+  useEffect(() => {
+    const handleFocus = () => {
+      if (onRefreshFridges) {
+        onRefreshFridges()
+      }
+    }
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [onRefreshFridges])
 
   const handlePlusClick = () => {
     setIsFormOpen(true)
@@ -542,7 +557,7 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange }: FridgeAppProps) {
       </nav>
 
       {/* Fridge Tabs */}
-      {allFridges.length > 1 && (
+      {allFridges.length > 0 && (
         <div
           style={{
             position: 'fixed',
@@ -558,7 +573,12 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange }: FridgeAppProps) {
             zIndex: 999
           }}
         >
-          {allFridges.map((fridge) => {
+          {[...allFridges].sort((a, b) => {
+            // Personal fridge always comes first
+            if (a.isPersonal && !b.isPersonal) return -1
+            if (!a.isPersonal && b.isPersonal) return 1
+            return 0
+          }).map((fridge) => {
             const isActive = fridge.fridgeId === fridgeId
             return (
               <button
@@ -724,7 +744,7 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange }: FridgeAppProps) {
           minHeight: '100vh',
           margin: 0,
           padding: '16px',
-          paddingTop: allFridges.length > 1 ? '104px' : '72px',
+          paddingTop: allFridges.length > 0 ? '104px' : '72px',
           gap: '16px',
           overflowY: 'auto',
           paddingBottom: '24px',
@@ -1654,6 +1674,7 @@ function LoadingScreen({ message }: { message: string }) {
 
 function App() {
   const { isAuthenticated, loading, user } = useAuth()
+  const location = useLocation()
   const [fridgeId, setFridgeId] = useState<string | null>(null)
   const [selectedFridgeId, setSelectedFridgeId] = useState<string | null>(null)
   const [allFridges, setAllFridges] = useState<Array<{ fridgeId: string; name: string; isPersonal: boolean }>>([])
@@ -1724,6 +1745,13 @@ function App() {
     }
   }, [isAuthenticated, user?.sub, ensureFridge, fetchAllFridges])
 
+  // Refresh fridge list when navigating back to home page (e.g., from invite page)
+  useEffect(() => {
+    if (isAuthenticated && user?.sub && location.pathname === '/') {
+      fetchAllFridges()
+    }
+  }, [location.pathname, isAuthenticated, user?.sub, fetchAllFridges])
+
   if (loading) {
     return <LoadingScreen message="Loading..." />
   }
@@ -1742,6 +1770,7 @@ function App() {
                   fridgeId={selectedFridgeId} 
                   allFridges={allFridges}
                   onFridgeChange={setSelectedFridgeId}
+                  onRefreshFridges={fetchAllFridges}
                 />
               : renderFridgeLoading
             : <Navigate to="/login" replace />

@@ -97,7 +97,7 @@ router.get('/user/:userId', async (req: Request, res: Response) => {
     }
 
     // Find all fridges where the user is a member
-    const fridges = await Fridge.find({ members: userId }).select('_id name members createdAt')
+    const fridges = await Fridge.find({ members: userId }).select('_id name members createdAt').sort({ createdAt: -1 })
 
     // Get user's profile to identify their personal fridge
     const profile = await UserProfile.findOne({ userId })
@@ -115,6 +115,18 @@ router.get('/user/:userId', async (req: Request, res: Response) => {
       }
     })
 
+    // Sort to ensure personal fridge comes first
+    formattedFridges.sort((a, b) => {
+      if (a.isPersonal && !b.isPersonal) return -1
+      if (!a.isPersonal && b.isPersonal) return 1
+      return 0
+    })
+
+    // Set cache-control headers to prevent caching
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+    res.setHeader('Pragma', 'no-cache')
+    res.setHeader('Expires', '0')
+    
     res.json({ fridges: formattedFridges })
   } catch (error) {
     console.error('Error fetching user fridges:', error)
