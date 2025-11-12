@@ -86,7 +86,7 @@ router.post('/', async (req: Request, res: Response) => {
       )
       
       // Update inviter's profile to point to the new shared fridge
-      inviterProfile.fridgeId = newFridge._id
+      inviterProfile.fridgeId = newFridge._id as mongoose.Types.ObjectId
       await inviterProfile.save()
     }
 
