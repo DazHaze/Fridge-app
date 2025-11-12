@@ -67,7 +67,7 @@ UserSchema.pre('save', async function (next) {
   
   try {
     const salt = await bcrypt.genSalt(10)
-    this.password = await bcrypt.hash(this.password, salt)
+    this.password = await bcrypt.hash(this.password as string, salt)
     next()
   } catch (error) {
     next(error as Error)
@@ -76,7 +76,7 @@ UserSchema.pre('save', async function (next) {
 
 // Compare password method
 UserSchema.methods.comparePassword = async function (candidatePassword: string): Promise<boolean> {
-  return bcrypt.compare(candidatePassword, this.password)
+  return bcrypt.compare(candidatePassword, this.password as string)
 }
 
 // Generate email verification token
