@@ -1,0 +1,282 @@
+import express, { Request, Response } from 'express'
+import mongoose from 'mongoose'
+import nodemailer from 'nodemailer'
+import User from '../models/User.js'
+import UserProfile from '../models/UserProfile.js'
+import Fridge from '../models/Fridge.js'
+
+const router = express.Router()
+
+const ensureMongoConnected = () => {
+  if (mongoose.connection.readyState !== 1) {
+    return { connected: false, message: 'Database not connected. Please check your MONGODB_URI in .env file' }
+  }
+  return { connected: true }
+}
+
+const createTransporter = () => {
+  if (process.env.SMTP_HOST) {
+    return nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT || 587),
+      secure: process.env.SMTP_SECURE === 'true',
+      auth: process.env.SMTP_USER && process.env.SMTP_PASS
+        ? {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS
+          }
+        : undefined
+    })
+  }
+
+  if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
+    return nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.GMAIL_USER,
+        pass: process.env.GMAIL_APP_PASSWORD
+      }
+    })
+  }
+
+  console.warn('No email transport configured. Set SMTP_HOST or GMAIL_USER/GMAIL_APP_PASSWORD environment variables.')
+  return null
+}
+
+const transporter = createTransporter()
+
+// Check if email exists (for Gmail accounts or regular users)
+router.get('/check-email/:email', async (req: Request, res: Response) => {
+  const connectionCheck = ensureMongoConnected()
+  if (!connectionCheck.connected) {
+    return res.status(503).json({ message: connectionCheck.message })
+  }
+
+  try {
+    const { email } = req.params
+    const normalizedEmail = email.toLowerCase().trim()
+
+    // Check if email exists in UserProfile (Gmail accounts)
+    const profile = await UserProfile.findOne({ email: normalizedEmail })
+    if (profile) {
+      return res.json({ exists: true, hasGmailAccount: true, message: 'This email is already linked to a Gmail account. Please sign in with Google.' })
+    }
+
+    // Check if email exists in User (email/password accounts)
+    const user = await User.findOne({ email: normalizedEmail })
+    if (user) {
+      return res.json({ exists: true, hasGmailAccount: false, isEmailVerified: user.isEmailVerified })
+    }
+
+    return res.json({ exists: false })
+  } catch (error) {
+    console.error('Error checking email:', error)
+    res.status(500).json({ message: 'Error checking email', error: String(error) })
+  }
+})
+
+// Sign up
+router.post('/signup', async (req: Request, res: Response) => {
+  const connectionCheck = ensureMongoConnected()
+  if (!connectionCheck.connected) {
+    return res.status(503).json({ message: connectionCheck.message })
+  }
+
+  try {
+    const { email, password, name } = req.body as { email?: string; password?: string; name?: string }
+
+    if (!email || !password || !name) {
+      return res.status(400).json({ message: 'Email, password, and name are required' })
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters long' })
+    }
+
+    const normalizedEmail = email.toLowerCase().trim()
+
+    // Check if email already exists
+    const existingUser = await User.findOne({ email: normalizedEmail })
+    if (existingUser) {
+      return res.status(400).json({ message: 'Email already registered. Please sign in instead.' })
+    }
+
+    // Check if email is linked to Gmail account
+    const profile = await UserProfile.findOne({ email: normalizedEmail })
+    if (profile) {
+      return res.status(400).json({ message: 'This email is already linked to a Gmail account. Please sign in with Google.' })
+    }
+
+    // Create user
+    const user = await User.create({
+      email: normalizedEmail,
+      password,
+      name: name.trim()
+    })
+
+    // Generate verification token
+    const token = user.generateEmailVerificationToken()
+    await user.save()
+
+    // Create fridge for user
+    const fridge = await Fridge.create({
+      members: [],
+      name: `${user.name}'s Fridge`
+    })
+
+    // Create user profile
+    const userIdString = (user._id as mongoose.Types.ObjectId).toString()
+    await UserProfile.create({
+      userId: userIdString,
+      email: normalizedEmail,
+      name: user.name,
+      fridgeId: fridge._id
+    })
+
+    // Add user to fridge
+    fridge.members.push(userIdString)
+    await fridge.save()
+
+    // Send verification email
+    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+    let finalBaseUrl = baseUrl.replace(/\/+$/, '')
+    if (!finalBaseUrl.includes('/Fridge-app') && !finalBaseUrl.includes('/fridge-app')) {
+      finalBaseUrl = finalBaseUrl + '/Fridge-app'
+    }
+    const verificationLink = `${finalBaseUrl}/verify-email?token=${token}`
+
+    if (transporter) {
+      const fromAddress = process.env.GMAIL_USER
+        ? process.env.GMAIL_USER
+        : process.env.MAIL_FROM ||
+          process.env.SMTP_USER ||
+          'no-reply@bia.app'
+      
+      try {
+        await transporter.sendMail({
+          from: `Bia Fridge <${fromAddress}>`,
+          to: normalizedEmail,
+          subject: 'Verify your Bia Fridge account',
+          html: `
+            <p>Hi ${user.name},</p>
+            <p>Thank you for signing up for Bia Fridge!</p>
+            <p>Please verify your email address by clicking the link below:</p>
+            <p><a href="${verificationLink}">${verificationLink}</a></p>
+            <p>This link will expire in 24 hours.</p>
+            <p>If you didn't create an account, you can safely ignore this email.</p>
+          `
+        })
+      } catch (emailError) {
+        console.error('Error sending verification email:', emailError)
+        // Still return success, but note email wasn't sent
+        return res.status(201).json({
+          message: 'Account created but verification email could not be sent. Please check email configuration.',
+          userId: userIdString,
+          verificationLink
+        })
+      }
+    } else {
+      console.info(`Verification link (email not sent): ${verificationLink}`)
+    }
+
+    res.status(201).json({
+      message: 'Account created successfully. Please check your email to verify your account.',
+      userId: userIdString
+    })
+  } catch (error) {
+    console.error('Error creating account:', error)
+    if ((error as any).code === 11000) {
+      return res.status(400).json({ message: 'Email already registered' })
+    }
+    res.status(500).json({ message: 'Error creating account', error: String(error) })
+  }
+})
+
+// Verify email
+router.get('/verify-email', async (req: Request, res: Response) => {
+  const connectionCheck = ensureMongoConnected()
+  if (!connectionCheck.connected) {
+    return res.status(503).json({ message: connectionCheck.message })
+  }
+
+  try {
+    const { token } = req.query as { token?: string }
+
+    if (!token) {
+      return res.status(400).json({ message: 'Verification token is required' })
+    }
+
+    const user = await User.findOne({
+      emailVerificationToken: token,
+      emailVerificationTokenExpiry: { $gt: new Date() }
+    })
+
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid or expired verification token' })
+    }
+
+    user.isEmailVerified = true
+    user.emailVerificationToken = undefined
+    user.emailVerificationTokenExpiry = undefined
+    await user.save()
+
+    res.json({ message: 'Email verified successfully' })
+  } catch (error) {
+    console.error('Error verifying email:', error)
+    res.status(500).json({ message: 'Error verifying email', error: String(error) })
+  }
+})
+
+// Login
+router.post('/login', async (req: Request, res: Response) => {
+  const connectionCheck = ensureMongoConnected()
+  if (!connectionCheck.connected) {
+    return res.status(503).json({ message: connectionCheck.message })
+  }
+
+  try {
+    const { email, password } = req.body as { email?: string; password?: string }
+
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required' })
+    }
+
+    const normalizedEmail = email.toLowerCase().trim()
+    const user = await User.findOne({ email: normalizedEmail })
+
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid email or password' })
+    }
+
+    const isPasswordValid = await user.comparePassword(password)
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: 'Invalid email or password' })
+    }
+
+    if (!user.isEmailVerified) {
+      return res.status(403).json({ 
+        message: 'Please verify your email before signing in. Check your inbox for the verification link.' 
+      })
+    }
+
+    // Get user profile
+    const userIdString = (user._id as mongoose.Types.ObjectId).toString()
+    const profile = await UserProfile.findOne({ userId: userIdString })
+    
+    res.json({
+      user: {
+        sub: userIdString,
+        email: user.email,
+        name: user.name,
+        picture: undefined
+      },
+      fridgeId: profile?.fridgeId?.toString()
+    })
+  } catch (error) {
+    console.error('Error logging in:', error)
+    res.status(500).json({ message: 'Error logging in', error: String(error) })
+  }
+})
+
+export default router
+

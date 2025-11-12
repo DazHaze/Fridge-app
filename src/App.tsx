@@ -6,6 +6,7 @@ import { useAuth } from './contexts/AuthContext'
 import Login from './components/Login'
 import InviteUser from './components/InviteUser'
 import AcceptInvite from './components/AcceptInvite'
+import VerifyEmail from './components/VerifyEmail'
 
 interface FridgeItem {
   _id: string
@@ -782,9 +783,7 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
             letterSpacing: '0.15px'
           }}
         >
-          {user?.name 
-            ? `${user.name}${user.name.endsWith('s') || user.name.endsWith('S') ? "'" : "'s"} Fridge`
-            : 'Fridge'}
+          Fridge
         </h2>
         
         <div
@@ -1802,6 +1801,10 @@ function App() {
       <Route
         path="/login"
         element={isAuthenticated ? <Navigate to="/" replace /> : <Login />}
+      />
+      <Route
+        path="/verify-email"
+        element={<VerifyEmail />}
       />
     </Routes>
   )
