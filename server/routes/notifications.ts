@@ -104,6 +104,11 @@ router.get('/user/:userId', async (req: Request, res: Response) => {
       return dateB - dateA
     })
 
+    // Set cache-control headers to prevent caching
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+    res.setHeader('Pragma', 'no-cache')
+    res.setHeader('Expires', '0')
+    
     res.json({ notifications: uniqueNotifications.slice(0, 100) })
   } catch (error) {
     console.error('Error fetching notifications:', error)
@@ -123,6 +128,11 @@ router.get('/user/:userId/unread-count', async (req: Request, res: Response) => 
     
     // Count unread stored notifications
     const notificationCount = await Notification.countDocuments({ userId, read: false })
+    
+    // Set cache-control headers to prevent caching
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+    res.setHeader('Pragma', 'no-cache')
+    res.setHeader('Expires', '0')
     
     // Get user profile to find their email
     const userProfile = await UserProfile.findOne({ userId })

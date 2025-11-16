@@ -10,6 +10,7 @@ import AcceptInvite from './components/AcceptInvite'
 import VerifyEmail from './components/VerifyEmail'
 import NotificationSidebar from './components/NotificationSidebar'
 import { Spinner } from '@/components/ui/spinner'
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet'
 
 interface FridgeItem {
   _id: string
@@ -29,10 +30,13 @@ interface FridgeAppProps {
 
 function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: FridgeAppProps) {
   const { user, logout } = useAuth()
-  const { unreadCount } = useNotifications()
+  const { unreadCount, refreshNotifications } = useNotifications()
   const userId = user?.sub || ''
   const navigate = useNavigate()
   const [isNotificationOpen, setIsNotificationOpen] = useState(false)
+  const [fridgeName, setFridgeName] = useState('')
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [nameLoading, setNameLoading] = useState(false)
 
   // Format personal fridge name: "[name]'s" or "[name]'" if name ends with 's'
   const formatPersonalFridgeName = (name: string | undefined): string => {
@@ -54,6 +58,7 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
   const [loading, setLoading] = useState(true)
   const [deletedCount, setDeletedCount] = useState(0)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
 
   // Capitalize item name (first letter of each word)
   const capitalizeName = (name: string): string => {
@@ -229,6 +234,57 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)
   }, [onRefreshFridges])
+
+  // Set current fridge name when fridgeId or allFridges changes
+  useEffect(() => {
+    if (fridgeId && allFridges.length > 0) {
+      const currentFridge = allFridges.find(f => f.fridgeId === fridgeId)
+      if (currentFridge) {
+        setFridgeName(currentFridge.name || '')
+      }
+    }
+  }, [fridgeId, allFridges])
+
+  const handleUpdateFridgeName = async () => {
+    if (!fridgeId || !userId || !fridgeName.trim()) {
+      return
+    }
+
+    setNameLoading(true)
+    try {
+      const response = await fetch(getApiUrl(`fridges/${fridgeId}/name`), {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: fridgeName.trim(),
+          userId: userId
+        })
+      })
+
+      if (response.ok) {
+        const responseData = await response.json()
+        setIsEditingName(false)
+        // Update local state immediately with the new name from response
+        setFridgeName(responseData.fridge?.name || fridgeName.trim())
+        // Refresh fridge list to get updated name in tabs
+        if (onRefreshFridges) {
+          await onRefreshFridges()
+          // Small delay to ensure state propagation
+          await new Promise(resolve => setTimeout(resolve, 100))
+        }
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        alert(errorData.message || 'Failed to update fridge name. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error updating fridge name:', error)
+      alert('Failed to connect to server. Please check your connection.')
+    } finally {
+      setNameLoading(false)
+    }
+  }
 
   const handlePlusClick = () => {
     setIsFormOpen(true)
@@ -409,6 +465,22 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
         } else {
           setItems([newItem, ...items])
         }
+        
+        // Refresh notifications after adding item (with delay to allow backend to create notification)
+        // Try refreshing multiple times to ensure we get the new notification
+        const refreshWithRetry = async (attempts = 3, delay = 300) => {
+          for (let i = 0; i < attempts; i++) {
+            await new Promise(resolve => setTimeout(resolve, delay * (i + 1)))
+            try {
+              await refreshNotifications()
+            } catch (err) {
+              console.error(`Error refreshing notifications (attempt ${i + 1}):`, err)
+            }
+          }
+        }
+        refreshWithRetry().catch(err => {
+          console.error('Error in notification refresh retry:', err)
+        })
         
         handleCloseForm()
       } else {
@@ -707,65 +779,6 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
         </div>
       </nav>
 
-      {/* Fridge Tabs */}
-      {allFridges.length > 0 && (
-        <div
-          style={{
-            position: 'fixed',
-            top: '56px',
-            left: 0,
-            right: 0,
-            backgroundColor: '#f5f5f5',
-            borderBottom: '1px solid rgba(0, 0, 0, 0.12)',
-            display: 'flex',
-            gap: '8px',
-            padding: '8px 16px',
-            overflowX: 'auto',
-            zIndex: 999
-          }}
-        >
-          {[...allFridges].sort((a, b) => {
-            // Personal fridge always comes first
-            if (a.isPersonal && !b.isPersonal) return -1
-            if (!a.isPersonal && b.isPersonal) return 1
-            return 0
-          }).map((fridge) => {
-            const isActive = fridge.fridgeId === fridgeId
-            return (
-              <button
-                key={fridge.fridgeId}
-                onClick={() => onFridgeChange(fridge.fridgeId)}
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: isActive ? '#6200ee' : 'transparent',
-                  color: isActive ? '#ffffff' : 'rgba(0, 0, 0, 0.87)',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
-                  fontWeight: isActive ? '500' : '400',
-                  whiteSpace: 'nowrap',
-                  transition: 'all 0.2s ease',
-                  boxShadow: isActive ? '0 2px 4px -1px rgba(0, 0, 0, 0.2)' : 'none'
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActive) {
-                    e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.08)'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive) {
-                    e.currentTarget.style.backgroundColor = 'transparent'
-                  }
-                }}
-              >
-                {fridge.isPersonal ? formatPersonalFridgeName(user?.name) : fridge.name}
-              </button>
-            )
-          })}
-        </div>
-      )}
-
       {/* Menu Dropdown */}
       {isMenuOpen && (
         <>
@@ -895,13 +908,69 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
           minHeight: '100vh',
           margin: 0,
           padding: '16px',
-          paddingTop: allFridges.length > 0 ? '104px' : '72px',
+          paddingTop: '72px',
           gap: '16px',
           overflowY: 'auto',
           paddingBottom: '24px',
           backgroundColor: '#f5f5f5'
         }}
       >
+      {/* Fridge Tabs */}
+      {allFridges.length > 0 && (
+        <div
+          style={{
+            width: '100%',
+            maxWidth: '400px',
+            backgroundColor: '#f5f5f5',
+            borderBottom: '1px solid rgba(0, 0, 0, 0.12)',
+            display: 'flex',
+            gap: '8px',
+            padding: '8px 16px',
+            overflowX: 'auto',
+            marginBottom: '8px'
+          }}
+        >
+          {[...allFridges].sort((a, b) => {
+            // Personal fridge always comes first
+            if (a.isPersonal && !b.isPersonal) return -1
+            if (!a.isPersonal && b.isPersonal) return 1
+            return 0
+          }).map((fridge) => {
+            const isActive = fridge.fridgeId === fridgeId
+            return (
+              <button
+                key={`${fridge.fridgeId}-${fridge.name || ''}`}
+                onClick={() => onFridgeChange(fridge.fridgeId)}
+                style={{
+                  padding: '8px 16px',
+                  backgroundColor: isActive ? '#6200ee' : 'transparent',
+                  color: isActive ? '#ffffff' : 'rgba(0, 0, 0, 0.87)',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '14px',
+                  fontWeight: isActive ? '500' : '400',
+                  whiteSpace: 'nowrap',
+                  transition: 'all 0.2s ease',
+                  boxShadow: isActive ? '0 2px 4px -1px rgba(0, 0, 0, 0.2)' : 'none'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.08)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.backgroundColor = 'transparent'
+                  }
+                }}
+              >
+                {fridge.isPersonal ? formatPersonalFridgeName(user?.name) : fridge.name}
+              </button>
+            )
+          })}
+        </div>
+      )}
       <div 
         className="fridge-items"
         style={{
@@ -923,18 +992,331 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
           boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.2), 0 4px 5px 0 rgba(0, 0, 0, 0.14), 0 1px 10px 0 rgba(0, 0, 0, 0.12)'
         }}
       >
-        <h2
+        {/* Header with title and settings icon */}
+        <div
           style={{
-            color: 'rgba(0, 0, 0, 0.87)',
-            fontSize: '20px',
-            fontWeight: '500',
-            margin: '0 0 16px 0',
-            textAlign: 'center',
-            letterSpacing: '0.15px'
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '16px',
+            position: 'relative'
           }}
         >
-          Fridge
-        </h2>
+          <h2
+            style={{
+              color: 'rgba(0, 0, 0, 0.87)',
+              fontSize: '20px',
+              fontWeight: '500',
+              margin: 0,
+              textAlign: 'center',
+              letterSpacing: '0.15px',
+              flex: 1
+            }}
+          >
+            Fridge
+          </h2>
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            style={{
+              backgroundColor: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minWidth: '40px',
+              minHeight: '40px',
+              borderRadius: '50%',
+              transition: 'background-color 0.2s ease',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+              position: 'absolute',
+              right: 0
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.08)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent'
+            }}
+            aria-label="Fridge settings"
+          >
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              style={{ display: 'block' }}
+            >
+              <path
+                d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"
+                fill="rgba(0, 0, 0, 0.54)"
+              />
+            </svg>
+          </button>
+        </div>
+
+        {/* Settings Sheet */}
+        {isSettingsOpen && (
+          <Sheet open={isSettingsOpen} onOpenChange={setIsSettingsOpen} side="right">
+            <SheetContent>
+              <SheetHeader onClose={() => setIsSettingsOpen(false)}>
+                <SheetTitle>Fridge Settings</SheetTitle>
+                <SheetDescription>Manage your fridge options</SheetDescription>
+              </SheetHeader>
+            <div
+              style={{
+                padding: '24px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '16px'
+              }}
+            >
+              {/* Change Fridge Name Section */}
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '12px'
+                }}
+              >
+                <label
+                  style={{
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    color: 'rgba(0, 0, 0, 0.87)',
+                    marginBottom: '4px'
+                  }}
+                >
+                  Fridge Name
+                </label>
+                {isEditingName ? (
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: '8px',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <input
+                      type="text"
+                      value={fridgeName}
+                      onChange={(e) => setFridgeName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleUpdateFridgeName()
+                        } else if (e.key === 'Escape') {
+                          setIsEditingName(false)
+                          // Reset to current fridge name
+                          const currentFridge = allFridges.find(f => f.fridgeId === fridgeId)
+                          if (currentFridge) {
+                            setFridgeName(currentFridge.name || '')
+                          }
+                        }
+                      }}
+                      style={{
+                        flex: 1,
+                        padding: '8px 12px',
+                        border: '1px solid rgba(0, 0, 0, 0.23)',
+                        borderRadius: '4px',
+                        fontSize: '14px',
+                        outline: 'none',
+                        transition: 'border-color 0.2s'
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = '#6200ee'
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.23)'
+                      }}
+                      autoFocus
+                    />
+                    <button
+                      onClick={handleUpdateFridgeName}
+                      disabled={nameLoading || !fridgeName.trim()}
+                      style={{
+                        padding: '8px 16px',
+                        backgroundColor: nameLoading || !fridgeName.trim() ? 'rgba(0, 0, 0, 0.12)' : '#6200ee',
+                        color: nameLoading || !fridgeName.trim() ? 'rgba(0, 0, 0, 0.26)' : '#ffffff',
+                        border: 'none',
+                        borderRadius: '4px',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        cursor: nameLoading || !fridgeName.trim() ? 'not-allowed' : 'pointer',
+                        transition: 'background-color 0.2s',
+                        minWidth: '60px'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!nameLoading && fridgeName.trim()) {
+                          e.currentTarget.style.backgroundColor = '#5300e0'
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!nameLoading && fridgeName.trim()) {
+                          e.currentTarget.style.backgroundColor = '#6200ee'
+                        }
+                      }}
+                    >
+                      {nameLoading ? <Spinner size="sm" /> : 'Save'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsEditingName(false)
+                        // Reset to current fridge name
+                        const currentFridge = allFridges.find(f => f.fridgeId === fridgeId)
+                        if (currentFridge) {
+                          setFridgeName(currentFridge.name || '')
+                        }
+                      }}
+                      disabled={nameLoading}
+                      style={{
+                        padding: '8px 12px',
+                        backgroundColor: 'transparent',
+                        color: 'rgba(0, 0, 0, 0.54)',
+                        border: '1px solid rgba(0, 0, 0, 0.23)',
+                        borderRadius: '4px',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        cursor: nameLoading ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!nameLoading) {
+                          e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.04)'
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!nameLoading) {
+                          e.currentTarget.style.backgroundColor = 'transparent'
+                        }
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    <span
+                      style={{
+                        flex: 1,
+                        padding: '8px 12px',
+                        backgroundColor: 'rgba(0, 0, 0, 0.04)',
+                        borderRadius: '4px',
+                        fontSize: '14px',
+                        color: 'rgba(0, 0, 0, 0.87)',
+                        minHeight: '36px',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                    >
+                      {fridgeName || 'Unnamed Fridge'}
+                    </span>
+                    <button
+                      onClick={() => setIsEditingName(true)}
+                      style={{
+                        padding: '8px 12px',
+                        backgroundColor: 'transparent',
+                        color: '#6200ee',
+                        border: '1px solid rgba(98, 0, 238, 0.5)',
+                        borderRadius: '4px',
+                        fontSize: '14px',
+                        fontWeight: '500',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'rgba(98, 0, 238, 0.08)'
+                        e.currentTarget.style.borderColor = '#6200ee'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'transparent'
+                        e.currentTarget.style.borderColor = 'rgba(98, 0, 238, 0.5)'
+                      }}
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <path
+                          d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
+                          fill="currentColor"
+                        />
+                      </svg>
+                      Edit
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={handleClearFridge}
+                style={{
+                  padding: '12px 16px',
+                  backgroundColor: 'transparent',
+                  color: '#d32f2f',
+                  border: '1px solid rgba(211, 47, 47, 0.5)',
+                  borderRadius: '4px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                  touchAction: 'manipulation',
+                  WebkitTapHighlightColor: 'transparent',
+                  textAlign: 'left',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(211, 47, 47, 0.08)'
+                  e.currentTarget.style.borderColor = '#d32f2f'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent'
+                  e.currentTarget.style.borderColor = 'rgba(211, 47, 47, 0.5)'
+                }}
+                onTouchStart={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(211, 47, 47, 0.08)'
+                }}
+                onTouchEnd={(e) => {
+                  setTimeout(() => {
+                    e.currentTarget.style.backgroundColor = 'transparent'
+                  }, 150)
+                }}
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  <path
+                    d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"
+                    fill="#d32f2f"
+                  />
+                </svg>
+                Clear Fridge
+              </button>
+            </div>
+          </SheetContent>
+        </Sheet>
+        )}
         
         <div
           style={{
@@ -1758,49 +2140,6 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
         </div>
       </div>
 
-      <button
-        onClick={handleClearFridge}
-        style={{
-          width: '100%',
-          maxWidth: '400px',
-          padding: '12px 24px',
-          backgroundColor: '#d32f2f',
-          color: '#ffffff',
-          border: 'none',
-          borderRadius: '4px',
-          fontSize: '14px',
-          fontWeight: '500',
-          cursor: 'pointer',
-          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-          marginTop: '8px',
-          minHeight: '36px',
-          touchAction: 'manipulation',
-          WebkitTapHighlightColor: 'transparent',
-          textTransform: 'uppercase',
-          letterSpacing: '0.5px',
-          boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.2), 0 4px 5px 0 rgba(0, 0, 0, 0.14), 0 1px 10px 0 rgba(0, 0, 0, 0.12)'
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.backgroundColor = '#c62828'
-          e.currentTarget.style.boxShadow = '0 3px 5px -1px rgba(0, 0, 0, 0.2), 0 6px 10px 0 rgba(0, 0, 0, 0.14), 0 1px 18px 0 rgba(0, 0, 0, 0.12)'
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = '#d32f2f'
-          e.currentTarget.style.boxShadow = '0 2px 4px -1px rgba(0, 0, 0, 0.2), 0 4px 5px 0 rgba(0, 0, 0, 0.14), 0 1px 10px 0 rgba(0, 0, 0, 0.12)'
-        }}
-        onTouchStart={(e) => {
-          e.currentTarget.style.backgroundColor = '#c62828'
-          e.currentTarget.style.transform = 'scale(0.98)'
-        }}
-        onTouchEnd={(e) => {
-          setTimeout(() => {
-            e.currentTarget.style.backgroundColor = '#d32f2f'
-            e.currentTarget.style.transform = 'scale(1)'
-          }, 150)
-        }}
-      >
-        Clear Fridge
-      </button>
     </div>
     build
 Process completed with exit code 2.
@@ -1898,10 +2237,19 @@ function App() {
     if (!user?.sub) return
 
     try {
-      const response = await fetch(getApiUrl(`fridges/user/${user.sub}`))
+      // Add timestamp to prevent caching
+      const timestamp = Date.now()
+      const response = await fetch(getApiUrl(`fridges/user/${user.sub}?t=${timestamp}`), {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      })
       if (response.ok) {
         const data = await response.json()
-        setAllFridges(data.fridges || [])
+        // Create a new array to ensure React detects the change
+        setAllFridges([...(data.fridges || [])])
         // Set selected fridge to personal fridge if available, otherwise first fridge
         setSelectedFridgeId((current) => {
           if (current) return current // Don't change if already set

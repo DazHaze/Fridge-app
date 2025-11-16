@@ -202,6 +202,54 @@ router.get('/user/:userId', async (req: Request, res: Response) => {
   }
 })
 
+// Update fridge name
+router.put('/:fridgeId/name', async (req: Request, res: Response) => {
+  const connectionCheck = ensureMongoConnected()
+  if (!connectionCheck.connected) {
+    return res.status(503).json({ message: connectionCheck.message })
+  }
+
+  try {
+    const { fridgeId } = req.params
+    const { name, userId } = req.body as { name?: string; userId?: string }
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ message: 'Fridge name is required' })
+    }
+
+    if (!userId) {
+      return res.status(400).json({ message: 'userId is required' })
+    }
+
+    // Find the fridge
+    const fridge = await Fridge.findById(fridgeId)
+    if (!fridge) {
+      return res.status(404).json({ message: 'Fridge not found' })
+    }
+
+    // Verify user is a member
+    if (!fridge.members.includes(userId)) {
+      return res.status(403).json({ message: 'You are not a member of this fridge' })
+    }
+
+    // Update the fridge name
+    fridge.name = name.trim()
+    await fridge.save()
+
+    res.json({ 
+      message: 'Fridge name updated successfully',
+      fridge: {
+        fridgeId: fridge._id.toString(),
+        name: fridge.name,
+        members: fridge.members
+      }
+    })
+  } catch (error) {
+    console.error('Error updating fridge name:', error)
+    res.status(500).json({ message: 'Error updating fridge name', error: String(error) })
+  }
+})
+
 export default router
 
 

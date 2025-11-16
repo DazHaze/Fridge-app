@@ -58,9 +58,23 @@ export const NotificationProvider = ({ children }: NotificationProviderProps) =>
     }
 
     try {
+      // Add timestamp to prevent caching
+      const timestamp = Date.now()
       const [notificationsResponse, countResponse] = await Promise.all([
-        fetch(getApiUrl(`notifications/user/${user.sub}`)),
-        fetch(getApiUrl(`notifications/user/${user.sub}/unread-count`))
+        fetch(getApiUrl(`notifications/user/${user.sub}?t=${timestamp}`), {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
+          }
+        }),
+        fetch(getApiUrl(`notifications/user/${user.sub}/unread-count?t=${timestamp}`), {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
+          }
+        })
       ])
 
       if (notificationsResponse.ok) {
