@@ -37,6 +37,7 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
   const [fridgeName, setFridgeName] = useState('')
   const [isEditingName, setIsEditingName] = useState(false)
   const [nameLoading, setNameLoading] = useState(false)
+  const [localFridges, setLocalFridges] = useState(allFridges)
 
   // Format personal fridge name: "[name]'s" or "[name]'" if name ends with 's'
   const formatPersonalFridgeName = (name: string | undefined): string => {
@@ -235,15 +236,22 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
     return () => window.removeEventListener('focus', handleFocus)
   }, [onRefreshFridges])
 
-  // Set current fridge name when fridgeId or allFridges changes
+  // Sync local fridges state when allFridges prop changes
   useEffect(() => {
-    if (fridgeId && allFridges.length > 0) {
-      const currentFridge = allFridges.find(f => f.fridgeId === fridgeId)
+    // Create new objects to ensure React detects the change
+    const newFridges = allFridges.map(f => ({ ...f }))
+    setLocalFridges(newFridges)
+  }, [allFridges])
+
+  // Set current fridge name when fridgeId or localFridges changes
+  useEffect(() => {
+    if (fridgeId && localFridges.length > 0) {
+      const currentFridge = localFridges.find(f => f.fridgeId === fridgeId)
       if (currentFridge) {
         setFridgeName(currentFridge.name || '')
       }
     }
-  }, [fridgeId, allFridges])
+  }, [fridgeId, localFridges])
 
   const handleUpdateFridgeName = async () => {
     if (!fridgeId || !userId || !fridgeName.trim()) {
@@ -272,6 +280,10 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
         
         // Refresh fridge list to get updated name in tabs
         if (onRefreshFridges) {
+          // Force a refresh by calling it twice with a small delay
+          await onRefreshFridges()
+          // Small delay to ensure the first refresh completes
+          await new Promise(resolve => setTimeout(resolve, 200))
           await onRefreshFridges()
         }
       } else {
@@ -916,8 +928,9 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
         }}
       >
       {/* Fridge Tabs */}
-      {allFridges.length > 0 && (
+      {localFridges.length > 0 && (
         <div
+          key={`fridge-tabs-${localFridges.map(f => `${f.fridgeId}:${f.name || ''}`).join('|')}`}
           style={{
             width: '100%',
             maxWidth: '400px',
@@ -930,7 +943,7 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
             marginBottom: '8px'
           }}
         >
-          {[...allFridges].sort((a, b) => {
+          {[...localFridges].sort((a, b) => {
             // Personal fridge always comes first
             if (a.isPersonal && !b.isPersonal) return -1
             if (!a.isPersonal && b.isPersonal) return 1
