@@ -1,0 +1,20 @@
+[33me62db78[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m, [m[1;31morigin/master[m[33m)[m Move navigation buttons to left and fix z-index for pop-ups
+[33m763a841[m Fix navigation, tabs, buttons, and forms layout to match Material Design
+[33m7b8e910[m Fix Material Design styling after shadcn conversion
+[33ma1139ad[m Notification check added to refresh if item is added
+[33m3505492[m updated bin to 'To Be Binned'
+[33m00cb428[m[33m ([m[1;31mheroku/master[m[33m)[m Fix TypeScript variable redeclaration error in auth route
+[33mcdfae0f[m Fix duplicate fridge creation bug and replace notification icon with Material Design SVG
+[33mf8c3e76[m Fix TypeScript errors for notification system deployment
+[33m9ff110a[m Add notification system with sidebar, account created, first item, expiring items, and fridge invite notifications
+[33ma717594[m Fix invite acceptance flow - preserve token through login and redirect to accept form
+[33m9d96108[m Disable Google auto-select and One Tap to prevent pre-filled account button
+[33ma03be3b[m Fix Google signup button - use ref to access current isSignup value in callback
+[33m7f8e628[m Add Google signup functionality - create account on signup page, require account on login page
+[33me3ba6ce[m Switch to sessionStorage and prevent auto-account creation on Google sign-in
+[33mee19f98[m Add comprehensive account checks and clear database script - Added account verification checks throughout backend routes - Added account checks in frontend before operations - Created script to clear all database data - Enhanced invite flow with account creation invites - Improved error handling and user guidance
+[33m17cd681[m Update shared fridge creation flow and personal fridge name formatting - Shared fridges now created only when invite is accepted - Personal fridge names use proper apostrophe formatting ([name]'s or [name]')
+[33m39f1240[m Fix TypeScript error in clearSharedFridges script
+[33mec8dd8a[m Make shared fridge name required and add script to clear shared fridges
+[33m2025d7a[m Fix TypeScript error in invites route - Add type assertion for fridgeId assignment
+[33mf9a7d7d[m Enforce one email per user and add fridge name to invite form - Prevent Google OAuth login if email exists in email/password accounts - Prevent email/password signup if email exists in Gmail accounts - Add optional fridge name field to invite form - Create new shared fridge when name is provided in invite
