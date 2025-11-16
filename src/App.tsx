@@ -267,12 +267,12 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
         const responseData = await response.json()
         setIsEditingName(false)
         // Update local state immediately with the new name from response
-        setFridgeName(responseData.fridge?.name || fridgeName.trim())
+        const newName = responseData.fridge?.name || fridgeName.trim()
+        setFridgeName(newName)
+        
         // Refresh fridge list to get updated name in tabs
         if (onRefreshFridges) {
           await onRefreshFridges()
-          // Small delay to ensure state propagation
-          await new Promise(resolve => setTimeout(resolve, 100))
         }
       } else {
         const errorData = await response.json().catch(() => ({}))
@@ -937,9 +937,10 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
             return 0
           }).map((fridge) => {
             const isActive = fridge.fridgeId === fridgeId
+            const displayName = fridge.isPersonal ? formatPersonalFridgeName(user?.name) : (fridge.name || 'Unnamed Fridge')
             return (
               <button
-                key={`${fridge.fridgeId}-${fridge.name || ''}`}
+                key={`${fridge.fridgeId}-${fridge.name || ''}-${fridge.isPersonal}`}
                 onClick={() => onFridgeChange(fridge.fridgeId)}
                 style={{
                   padding: '8px 16px',
@@ -965,7 +966,7 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
                   }
                 }}
               >
-                {fridge.isPersonal ? formatPersonalFridgeName(user?.name) : fridge.name}
+                {displayName}
               </button>
             )
           })}
@@ -2248,13 +2249,20 @@ function App() {
       })
       if (response.ok) {
         const data = await response.json()
-        // Create a new array to ensure React detects the change
-        setAllFridges([...(data.fridges || [])])
+        // Create a new array with new objects to ensure React detects the change
+        const newFridges = (data.fridges || []).map((fridge: { fridgeId: string; name: string; isPersonal: boolean; members: string[]; createdAt: Date }) => ({
+          fridgeId: fridge.fridgeId,
+          name: fridge.name,
+          isPersonal: fridge.isPersonal,
+          members: [...fridge.members],
+          createdAt: fridge.createdAt
+        }))
+        setAllFridges(newFridges)
         // Set selected fridge to personal fridge if available, otherwise first fridge
         setSelectedFridgeId((current) => {
           if (current) return current // Don't change if already set
-          const personalFridge = data.fridges?.find((f: { isPersonal: boolean }) => f.isPersonal)
-          const firstFridge = data.fridges?.[0]
+          const personalFridge = newFridges.find((f: { isPersonal: boolean }) => f.isPersonal)
+          const firstFridge = newFridges[0]
           return personalFridge?.fridgeId || firstFridge?.fridgeId || null
         })
       }
