@@ -1886,7 +1886,21 @@ function App() {
       />
       <Route
         path="/login"
-        element={isAuthenticated ? <Navigate to="/" replace /> : <Login />}
+        element={
+          isAuthenticated ? (
+            (() => {
+              // Check if there's an inviteToken in the URL
+              const urlParams = new URLSearchParams(window.location.search)
+              const inviteToken = urlParams.get('inviteToken')
+              if (inviteToken) {
+                return <Navigate to={`/invite/accept?token=${inviteToken}`} replace />
+              }
+              return <Navigate to="/" replace />
+            })()
+          ) : (
+            <Login />
+          )
+        }
       />
       <Route
         path="/verify-email"

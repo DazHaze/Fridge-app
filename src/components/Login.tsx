@@ -144,6 +144,10 @@ const Login = () => {
                     picture: userData.picture,
                     sub: userData.sub
                   })
+                  // Redirect to invite acceptance if token exists, otherwise go home
+                  if (inviteToken) {
+                    navigate(`/invite/accept?token=${inviteToken}`, { replace: true })
+                  }
                 } else {
                   // Account creation failed
                   alert(signupData.message || 'Failed to create account. Please try again.')
@@ -182,6 +186,10 @@ const Login = () => {
               picture: userData.picture,
               sub: userData.sub
             })
+            // Redirect to invite acceptance if token exists, otherwise stay on page (App.tsx will redirect)
+            if (inviteToken) {
+              navigate(`/invite/accept?token=${inviteToken}`, { replace: true })
+            }
           }
         } catch (checkError) {
           console.error('Error checking account:', checkError)
@@ -411,6 +419,10 @@ const Login = () => {
 
       if (response.ok) {
         login(data.user)
+        // Redirect to invite acceptance if token exists, otherwise stay on page (App.tsx will redirect)
+        if (inviteToken) {
+          navigate(`/invite/accept?token=${inviteToken}`, { replace: true })
+        }
       } else {
         setLoginError(data.message || 'Invalid email or password')
       }

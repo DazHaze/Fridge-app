@@ -150,7 +150,7 @@ const AcceptInvite = ({ isAuthenticated, ensureFridge, onAccept }: AcceptInviteP
             You need to sign in with Google before you can join the shared fridge.
           </p>
           <button
-            onClick={() => navigate('/login')}
+            onClick={() => navigate(`/login?inviteToken=${token}`)}
             style={{
               padding: '12px 16px',
               backgroundColor: '#6200ee',
