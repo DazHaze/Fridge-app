@@ -546,17 +546,46 @@ router.post('/accept', async (req: Request, res: Response) => {
     const originalFridgeId = profile?.fridgeId
 
     if (!profile) {
-      // New user - create profile with a personal fridge
-      const personalFridge = await Fridge.create({
-        members: [userId],
-        name: name ? formatPersonalFridgeName(name) : undefined
+      // User has account but no profile - check if personal fridge already exists
+      // This can happen due to race conditions during signup
+      const existingPersonalFridge = await Fridge.findOne({ 
+        members: [userId]
       })
-      profile = await UserProfile.create({
-        userId,
-        email,
-        name,
-        fridgeId: personalFridge._id as mongoose.Types.ObjectId
-      })
+      
+      if (existingPersonalFridge) {
+        // Personal fridge exists - create profile pointing to it
+        profile = await UserProfile.create({
+          userId,
+          email,
+          name,
+          fridgeId: existingPersonalFridge._id as mongoose.Types.ObjectId
+        })
+      } else {
+        // Check if user is a member of any fridge (could be shared fridge)
+        const anyFridge = await Fridge.findOne({ members: userId })
+        
+        if (anyFridge) {
+          // User is member of a fridge but no profile - create profile pointing to it
+          profile = await UserProfile.create({
+            userId,
+            email,
+            name,
+            fridgeId: anyFridge._id as mongoose.Types.ObjectId
+          })
+        } else {
+          // No fridge exists - create personal fridge and profile
+          const personalFridge = await Fridge.create({
+            members: [userId],
+            name: name ? formatPersonalFridgeName(name) : undefined
+          })
+          profile = await UserProfile.create({
+            userId,
+            email,
+            name,
+            fridgeId: personalFridge._id as mongoose.Types.ObjectId
+          })
+        }
+      }
     } else {
       // Existing user - update email/name if provided, but keep their personal fridge
       if (email) {

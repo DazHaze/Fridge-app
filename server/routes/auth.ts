@@ -128,15 +128,28 @@ router.post('/signup', async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'Account already exists. Please sign in instead.' })
     }
 
-    // Check if a fridge already exists for this user
-    let fridge = await Fridge.findOne({ members: userIdString })
+    // Check if a personal fridge already exists for this user (race condition protection)
+    // A personal fridge is one where the user is the ONLY member
+    let fridge = await Fridge.findOne({ 
+      members: [userIdString]
+    })
     
     if (!fridge) {
-      // Create fridge for user
-      fridge = await Fridge.create({
-        members: [userIdString],
-        name: `${user.name}'s Fridge`
-      })
+      // Double-check: maybe user is member of a shared fridge but no personal fridge
+      // Only create personal fridge if user has NO fridges at all
+      const anyFridge = await Fridge.findOne({ members: userIdString })
+      
+      if (!anyFridge) {
+        // No fridge exists - create personal fridge
+        fridge = await Fridge.create({
+          members: [userIdString],
+          name: `${user.name}'s Fridge`
+        })
+      } else {
+        // User is member of a shared fridge but no personal fridge
+        // Use the shared fridge for now (this shouldn't normally happen during signup)
+        fridge = anyFridge
+      }
     }
 
     // Create user profile
@@ -278,17 +291,30 @@ router.post('/google-signup', async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'This email is already linked to a Google account. Please sign in with Google instead.' })
     }
 
-    // Check if a fridge already exists for this user (race condition protection)
-    let fridge = await Fridge.findOne({ members: userId })
+    // Check if a personal fridge already exists for this user (race condition protection)
+    // A personal fridge is one where the user is the ONLY member
+    let fridge = await Fridge.findOne({ 
+      members: [userId]
+    })
     
     if (!fridge) {
-      // Create personal fridge for user
-      fridge = await Fridge.create({
-        members: [userId],
-        name: name.trim().toLowerCase().endsWith('s') 
-          ? `${name.trim()}' Fridge` 
-          : `${name.trim()}'s Fridge`
-      })
+      // Double-check: maybe user is member of a shared fridge but no personal fridge
+      // Only create personal fridge if user has NO fridges at all
+      const anyFridge = await Fridge.findOne({ members: userId })
+      
+      if (!anyFridge) {
+        // No fridge exists - create personal fridge
+        fridge = await Fridge.create({
+          members: [userId],
+          name: name.trim().toLowerCase().endsWith('s') 
+            ? `${name.trim()}' Fridge` 
+            : `${name.trim()}'s Fridge`
+        })
+      } else {
+        // User is member of a shared fridge but no personal fridge
+        // Use the shared fridge for now (this shouldn't normally happen during signup)
+        fridge = anyFridge
+      }
     }
 
     // Create user profile

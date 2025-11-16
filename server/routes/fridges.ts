@@ -65,30 +65,48 @@ router.post('/ensure', async (req: Request, res: Response) => {
     let profile = await UserProfile.findOne({ userId })
 
     if (!profile) {
-      // Check if a fridge already exists for this user (race condition protection)
-      const existingFridge = await Fridge.findOne({ members: userId })
+      // Check if a personal fridge already exists for this user (race condition protection)
+      // A personal fridge is one where the user is the ONLY member
+      const existingPersonalFridge = await Fridge.findOne({ 
+        members: [userId]
+      })
       
-      if (existingFridge) {
-        // Fridge exists but profile doesn't - create profile with existing fridge
+      if (existingPersonalFridge) {
+        // Personal fridge exists but profile doesn't - create profile with existing fridge
         profile = await UserProfile.create({
           userId,
           email,
           name,
-          fridgeId: existingFridge._id
+          fridgeId: existingPersonalFridge._id
         })
       } else {
-        // No fridge exists - create both fridge and profile
-        const fridge = await Fridge.create({
-          members: [userId],
-          name: name ? formatPersonalFridgeName(name) : undefined
-        })
+        // Double-check: maybe there's a fridge with this user as a member (could be shared fridge)
+        // But we only want to create a personal fridge if NO fridge exists for this user
+        const anyFridge = await Fridge.findOne({ members: userId })
+        
+        if (anyFridge) {
+          // A fridge exists (could be shared), but user doesn't have a profile
+          // This shouldn't happen normally, but create profile pointing to this fridge
+          profile = await UserProfile.create({
+            userId,
+            email,
+            name,
+            fridgeId: anyFridge._id
+          })
+        } else {
+          // No fridge exists at all - create both personal fridge and profile
+          const fridge = await Fridge.create({
+            members: [userId],
+            name: name ? formatPersonalFridgeName(name) : undefined
+          })
 
-        profile = await UserProfile.create({
-          userId,
-          email,
-          name,
-          fridgeId: fridge._id
-        })
+          profile = await UserProfile.create({
+            userId,
+            email,
+            name,
+            fridgeId: fridge._id
+          })
+        }
       }
     } else {
       const updates: Partial<{ email: string; name: string }> = {}
