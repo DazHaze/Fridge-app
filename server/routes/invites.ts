@@ -234,7 +234,7 @@ router.post('/', async (req: Request, res: Response) => {
       if (inviteeProfile) {
         await createFridgeInviteNotification(
           inviteeProfile.userId,
-          invite._id.toString(),
+          (invite._id as mongoose.Types.ObjectId).toString(),
           token,
           fridgeName.trim(),
           inviterProfile.name || 'Someone'

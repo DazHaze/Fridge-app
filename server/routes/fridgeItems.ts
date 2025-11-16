@@ -153,7 +153,7 @@ router.post('/', async (req: Request, res: Response) => {
       const itemCount = await FridgeItem.countDocuments({ fridgeId, userId })
       if (itemCount === 1) {
         // This is the first item - create notification
-        await createFirstItemNotification(userId, fridgeId, savedItem._id.toString())
+        await createFirstItemNotification(userId, fridgeId, (savedItem._id as mongoose.Types.ObjectId).toString())
       }
     }
 

@@ -75,7 +75,7 @@ router.get('/user/:userId', async (req: Request, res: Response) => {
           message: `${inviterProfile?.name || 'Someone'} invited you to join "${invite.fridgeName}". Click to accept!`,
           read: false,
           metadata: {
-            inviteId: invite._id.toString(),
+            inviteId: (invite._id as mongoose.Types.ObjectId).toString(),
             inviteToken: invite.token
           },
           createdAt: invite.createdAt,
@@ -88,10 +88,12 @@ router.get('/user/:userId', async (req: Request, res: Response) => {
     const allNotifications = [...storedNotifications.map(n => n.toObject()), ...inviteNotifications]
     const uniqueNotifications = allNotifications.filter((notification, index, self) =>
       index === self.findIndex((n) => {
-        if (notification._id.toString().startsWith('invite_')) {
+        const notificationId = typeof notification._id === 'string' ? notification._id : (notification._id as mongoose.Types.ObjectId).toString()
+        const nId = typeof n._id === 'string' ? n._id : (n._id as mongoose.Types.ObjectId).toString()
+        if (notificationId.startsWith('invite_')) {
           return n.metadata?.inviteToken === notification.metadata?.inviteToken
         }
-        return n._id.toString() === notification._id.toString()
+        return nId === notificationId
       })
     )
 
@@ -177,7 +179,7 @@ router.post('/check-expiring-items', async (req: Request, res: Response) => {
       const existingNotification = await Notification.findOne({
         userId: { $in: fridge.members },
         type: 'item_expiring_tomorrow',
-        'metadata.itemId': item._id.toString(),
+        'metadata.itemId': (item._id as mongoose.Types.ObjectId).toString(),
         createdAt: {
           $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) // Within last 24 hours
         }
@@ -189,8 +191,8 @@ router.post('/check-expiring-items', async (req: Request, res: Response) => {
       for (const memberId of fridge.members) {
         await createItemExpiringNotification(
           memberId,
-          item.fridgeId.toString(),
-          item._id.toString(),
+          (item.fridgeId as mongoose.Types.ObjectId).toString(),
+          (item._id as mongoose.Types.ObjectId).toString(),
           item.name
         )
         notificationsCreated++
