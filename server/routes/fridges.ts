@@ -13,6 +13,15 @@ const ensureMongoConnected = () => {
   return { connected: true }
 }
 
+// Format personal fridge name: "[name]'s" or "[name]'" if name ends with 's'
+const formatPersonalFridgeName = (name: string): string => {
+  const trimmedName = name.trim()
+  if (trimmedName.toLowerCase().endsWith('s')) {
+    return `${trimmedName}' Fridge`
+  }
+  return `${trimmedName}'s Fridge`
+}
+
 router.post('/ensure', async (req: Request, res: Response) => {
   const connectionCheck = ensureMongoConnected()
   if (!connectionCheck.connected) {
@@ -31,7 +40,7 @@ router.post('/ensure', async (req: Request, res: Response) => {
     if (!profile) {
       const fridge = await Fridge.create({
         members: [userId],
-        name: name ? `${name}'s Fridge` : undefined
+        name: name ? formatPersonalFridgeName(name) : undefined
       })
 
       profile = await UserProfile.create({

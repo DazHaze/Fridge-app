@@ -28,6 +28,16 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
   const { user, logout } = useAuth()
   const userId = user?.sub || ''
   const navigate = useNavigate()
+
+  // Format personal fridge name: "[name]'s" or "[name]'" if name ends with 's'
+  const formatPersonalFridgeName = (name: string | undefined): string => {
+    if (!name) return 'My Fridge'
+    const trimmedName = name.trim()
+    if (trimmedName.toLowerCase().endsWith('s')) {
+      return `${trimmedName}' Fridge`
+    }
+    return `${trimmedName}'s Fridge`
+  }
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isEditFormOpen, setIsEditFormOpen] = useState(false)
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
@@ -609,7 +619,7 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
                   }
                 }}
               >
-                {fridge.isPersonal ? `${user?.name || 'My'} Fridge` : fridge.name}
+                {fridge.isPersonal ? formatPersonalFridgeName(user?.name) : fridge.name}
               </button>
             )
           })}

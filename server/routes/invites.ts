@@ -16,6 +16,15 @@ const ensureMongoConnected = () => {
   return { connected: true }
 }
 
+// Format personal fridge name: "[name]'s" or "[name]'" if name ends with 's'
+const formatPersonalFridgeName = (name: string): string => {
+  const trimmedName = name.trim()
+  if (trimmedName.toLowerCase().endsWith('s')) {
+    return `${trimmedName}' Fridge`
+  }
+  return `${trimmedName}'s Fridge`
+}
+
 const createTransporter = () => {
   if (process.env.SMTP_HOST) {
     return nodemailer.createTransport({
@@ -70,30 +79,14 @@ router.post('/', async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'fridgeName is required when creating a shared fridge' })
     }
 
-    const oldFridgeId = inviterProfile.fridgeId
-    // Create a new shared fridge with the provided name
-    const newFridge = await Fridge.create({
-      members: [inviterId],
-      name: fridgeName.trim()
-    })
-    const fridge = newFridge
-    
-    // Move inviter's items to the new shared fridge
-    await FridgeItem.updateMany(
-      { fridgeId: oldFridgeId },
-      { fridgeId: newFridge._id }
-    )
-    
-    // Update inviter's profile to point to the new shared fridge
-    inviterProfile.fridgeId = newFridge._id as mongoose.Types.ObjectId
-    await inviterProfile.save()
-
+    // Don't create the fridge yet - store the name in the invite
+    // The fridge will be created when the invite is accepted
     const token = crypto.randomUUID()
     const expiryHours = Number(process.env.INVITE_EXPIRY_HOURS || 72)
     const expiresAt = new Date(Date.now() + expiryHours * 60 * 60 * 1000)
 
     const invite = await Invite.create({
-      fridgeId: fridge._id,
+      fridgeName: fridgeName.trim(),
       inviterId,
       inviteeEmail: inviteeEmail.toLowerCase(),
       token,
@@ -125,7 +118,7 @@ router.post('/', async (req: Request, res: Response) => {
         : fromAddress
       
       try {
-        const fridgeDisplayName = fridge.name || 'a fridge'
+        const fridgeDisplayName = invite.fridgeName || 'a shared fridge'
         await transporter.sendMail({
           from: displayFrom,
           to: inviteeEmail,
@@ -176,7 +169,8 @@ router.post('/accept', async (req: Request, res: Response) => {
     }
 
     if (invite.status === 'accepted') {
-      return res.json({ message: 'Invite already accepted', fridgeId: invite.fridgeId })
+      const fridgeId = invite.fridgeId ? invite.fridgeId.toString() : null
+      return res.json({ message: 'Invite already accepted', fridgeId })
     }
 
     if (invite.expiresAt.getTime() < Date.now()) {
@@ -185,9 +179,35 @@ router.post('/accept', async (req: Request, res: Response) => {
       return res.status(410).json({ message: 'Invite has expired' })
     }
 
-    const fridge = await Fridge.findById(invite.fridgeId)
+    // Check if fridge already exists (for backward compatibility with old invites)
+    let fridge = invite.fridgeId ? await Fridge.findById(invite.fridgeId) : null
+    
+    // If fridge doesn't exist yet, create it now with the stored name
     if (!fridge) {
-      return res.status(404).json({ message: 'Fridge not found for invite' })
+      if (!invite.fridgeName) {
+        return res.status(400).json({ message: 'Fridge name not found in invite' })
+      }
+
+      const inviterProfile = await UserProfile.findOne({ userId: invite.inviterId })
+      if (!inviterProfile) {
+        return res.status(404).json({ message: 'Inviter profile not found' })
+      }
+
+      // Create the shared fridge with the stored name
+      // Both inviter and invitee will be members, but they keep their personal fridges
+      fridge = await Fridge.create({
+        members: [invite.inviterId, userId],
+        name: invite.fridgeName.trim()
+      })
+
+      // Update invite with the created fridge ID
+      invite.fridgeId = fridge._id as mongoose.Types.ObjectId
+    } else {
+      // Fridge already exists (old invite format), just add the user as a member
+      if (!fridge.members.includes(userId)) {
+        fridge.members.push(userId)
+        await fridge.save()
+      }
     }
 
     const fridgeId = fridge._id as mongoose.Types.ObjectId
@@ -196,14 +216,19 @@ router.post('/accept', async (req: Request, res: Response) => {
     const originalFridgeId = profile?.fridgeId
 
     if (!profile) {
+      // New user - create profile with a personal fridge
+      const personalFridge = await Fridge.create({
+        members: [userId],
+        name: name ? formatPersonalFridgeName(name) : undefined
+      })
       profile = await UserProfile.create({
         userId,
         email,
         name,
-        fridgeId
+        fridgeId: personalFridge._id as mongoose.Types.ObjectId
       })
     } else {
-      profile.fridgeId = fridgeId
+      // Existing user - update email/name if provided, but keep their personal fridge
       if (email) {
         profile.email = email
       }
@@ -211,24 +236,6 @@ router.post('/accept', async (req: Request, res: Response) => {
         profile.name = name
       }
       await profile.save()
-    }
-
-    if (!fridge.members.includes(userId)) {
-      fridge.members.push(userId)
-      await fridge.save()
-    }
-
-    if (originalFridgeId && !originalFridgeId.equals(fridgeId)) {
-      await FridgeItem.updateMany(
-        { fridgeId: originalFridgeId },
-        { fridgeId: fridgeId }
-      )
-
-      const originalFridge = await Fridge.findById(originalFridgeId)
-      if (originalFridge) {
-        originalFridge.members = originalFridge.members.filter(member => member !== userId)
-        await originalFridge.save()
-      }
     }
 
     invite.status = 'accepted'

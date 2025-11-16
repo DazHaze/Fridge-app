@@ -1,7 +1,8 @@
 import mongoose, { Schema, Document } from 'mongoose'
 
 export interface IInvite extends Document {
-  fridgeId: mongoose.Types.ObjectId
+  fridgeId?: mongoose.Types.ObjectId
+  fridgeName?: string
   inviterId: string
   inviteeEmail: string
   token: string
@@ -16,8 +17,12 @@ const InviteSchema: Schema = new Schema(
     fridgeId: {
       type: Schema.Types.ObjectId,
       ref: 'Fridge',
-      required: true,
+      required: false,
       index: true
+    },
+    fridgeName: {
+      type: String,
+      trim: true
     },
     inviterId: {
       type: String,
