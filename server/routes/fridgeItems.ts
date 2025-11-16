@@ -3,7 +3,8 @@ import mongoose from 'mongoose'
 import FridgeItem from '../models/FridgeItem.js'
 import UserProfile from '../models/UserProfile.js'
 import Fridge from '../models/Fridge.js'
-import { createFirstItemNotification } from '../utils/notificationHelper.js'
+import { createFirstItemNotification, createItemExpiringNotification } from '../utils/notificationHelper.js'
+import Notification from '../models/Notification.js'
 
 const router = express.Router()
 
@@ -157,6 +158,52 @@ router.post('/', async (req: Request, res: Response) => {
       }
     }
 
+    // Check if this item expires tomorrow and create notifications immediately
+    const itemExpiryDate = new Date(savedItem.expiryDate)
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    tomorrow.setHours(0, 0, 0, 0)
+    const dayAfterTomorrow = new Date(tomorrow)
+    dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 1)
+
+    // If item expires tomorrow and is not opened, create notifications
+    if (itemExpiryDate >= tomorrow && itemExpiryDate < dayAfterTomorrow && !savedItem.isOpened) {
+      try {
+        const fridge = await Fridge.findById(fridgeId)
+        if (fridge) {
+          const itemId = (savedItem._id as mongoose.Types.ObjectId).toString()
+          const todayStart = new Date()
+          todayStart.setHours(0, 0, 0, 0)
+
+          // Create notification for each member, but only if they don't already have one
+          for (const memberId of fridge.members) {
+            // Check if this specific user already has a notification for this item today
+            const existingNotification = await Notification.findOne({
+              userId: memberId,
+              type: 'item_expiring_tomorrow',
+              'metadata.itemId': itemId,
+              createdAt: {
+                $gte: todayStart
+              }
+            })
+
+            // Skip if notification already exists for this user today
+            if (!existingNotification) {
+              await createItemExpiringNotification(
+                memberId,
+                fridgeId,
+                itemId,
+                savedItem.name
+              )
+            }
+          }
+        }
+      } catch (notificationError) {
+        // Don't fail the item creation if notification fails
+        console.error('Error creating expiring item notification:', notificationError)
+      }
+    }
+
     res.status(201).json(savedItem)
   } catch (error) {
     console.error('Error saving item to database:', error)
@@ -224,6 +271,52 @@ router.put('/:id', async (req: Request, res: Response) => {
 
     if (!updatedItem) {
       return res.status(404).json({ message: 'Item not found in fridge' })
+    }
+
+    // Check if this item expires tomorrow and create notifications immediately
+    const itemExpiryDate = new Date(updatedItem.expiryDate)
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    tomorrow.setHours(0, 0, 0, 0)
+    const dayAfterTomorrow = new Date(tomorrow)
+    dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 1)
+
+    // If item expires tomorrow and is not opened, create notifications
+    if (itemExpiryDate >= tomorrow && itemExpiryDate < dayAfterTomorrow && !updatedItem.isOpened) {
+      try {
+        const fridge = await Fridge.findById(fridgeId)
+        if (fridge) {
+          const itemId = (updatedItem._id as mongoose.Types.ObjectId).toString()
+          const todayStart = new Date()
+          todayStart.setHours(0, 0, 0, 0)
+
+          // Create notification for each member, but only if they don't already have one
+          for (const memberId of fridge.members) {
+            // Check if this specific user already has a notification for this item today
+            const existingNotification = await Notification.findOne({
+              userId: memberId,
+              type: 'item_expiring_tomorrow',
+              'metadata.itemId': itemId,
+              createdAt: {
+                $gte: todayStart
+              }
+            })
+
+            // Skip if notification already exists for this user today
+            if (!existingNotification) {
+              await createItemExpiringNotification(
+                memberId,
+                fridgeId,
+                itemId,
+                updatedItem.name
+              )
+            }
+          }
+        }
+      } catch (notificationError) {
+        // Don't fail the item update if notification fails
+        console.error('Error creating expiring item notification:', notificationError)
+      }
     }
 
     res.json(updatedItem)
