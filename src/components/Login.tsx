@@ -35,6 +35,8 @@ const Login = () => {
   const [isSignup, setIsSignup] = useState(shouldSignup || false)
   const [buttonLoading, setButtonLoading] = useState(true)
   const [buttonError, setButtonError] = useState(false)
+  // Use a ref to always have the current isSignup value in the callback
+  const isSignupRef = useRef(isSignup)
   
   // Signup form state
   const [signupName, setSignupName] = useState('')
@@ -44,6 +46,11 @@ const Login = () => {
   const [signupLoading, setSignupLoading] = useState(false)
   const [signupError, setSignupError] = useState<string | null>(null)
   const [signupSuccess, setSignupSuccess] = useState(false)
+
+  // Update ref when isSignup changes
+  useEffect(() => {
+    isSignupRef.current = isSignup
+  }, [isSignup])
 
   // Fetch invite email if inviteToken is present
   useEffect(() => {
@@ -99,7 +106,8 @@ const Login = () => {
           
           if (!accountCheckData.hasAccount) {
             // User does not have an account
-            if (isSignup) {
+            // Use ref to get current value of isSignup
+            if (isSignupRef.current) {
               // On signup page - create account for Google user
               try {
                 const signupResponse = await fetch(getApiUrl('auth/google-signup'), {
@@ -179,6 +187,9 @@ const Login = () => {
     const initializeGoogleSignIn = () => {
       if (window.google?.accounts?.id && buttonRef.current) {
         try {
+          // Clear any existing button before re-rendering
+          buttonRef.current.innerHTML = ''
+          
           window.google.accounts.id.initialize({
             client_id: clientId,
             callback: handleCredentialResponse
@@ -232,6 +243,10 @@ const Login = () => {
     return () => {
       if (checkInterval) {
         clearInterval(checkInterval)
+      }
+      // Clear the button when component unmounts or dependencies change
+      if (buttonRef.current) {
+        buttonRef.current.innerHTML = ''
       }
     }
   }, [login, isSignup])
