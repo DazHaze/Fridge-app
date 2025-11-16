@@ -254,13 +254,20 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
   }, [fridgeId, localFridges])
 
   const handleUpdateFridgeName = async () => {
+    console.log('handleUpdateFridgeName called', { fridgeId, userId, fridgeName: fridgeName.trim() })
+    
     if (!fridgeId || !userId || !fridgeName.trim()) {
+      console.log('Early return - missing required values', { fridgeId: !!fridgeId, userId: !!userId, fridgeName: fridgeName.trim() })
+      alert('Missing required information. Please try again.')
       return
     }
 
     setNameLoading(true)
     try {
-      const response = await fetch(getApiUrl(`fridges/${fridgeId}/name`), {
+      const url = getApiUrl(`fridges/${fridgeId}/name`)
+      console.log('Sending request to:', url)
+      
+      const response = await fetch(url, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -271,8 +278,11 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
         })
       })
 
+      console.log('Response status:', response.status, response.statusText)
+
       if (response.ok) {
         const responseData = await response.json()
+        console.log('Response data:', responseData)
         setIsEditingName(false)
         // Update local state immediately with the new name from response
         const newName = responseData.fridge?.name || fridgeName.trim()
@@ -280,19 +290,22 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
         
         // Refresh fridge list to get updated name in tabs
         if (onRefreshFridges) {
+          console.log('Refreshing fridge list...')
           // Force a refresh by calling it twice with a small delay
           await onRefreshFridges()
           // Small delay to ensure the first refresh completes
           await new Promise(resolve => setTimeout(resolve, 200))
           await onRefreshFridges()
+          console.log('Fridge list refreshed')
         }
       } else {
         const errorData = await response.json().catch(() => ({}))
-        alert(errorData.message || 'Failed to update fridge name. Please try again.')
+        console.error('Error response:', errorData)
+        alert(errorData.message || `Failed to update fridge name. Status: ${response.status}`)
       }
     } catch (error) {
       console.error('Error updating fridge name:', error)
-      alert('Failed to connect to server. Please check your connection.')
+      alert(`Failed to connect to server: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setNameLoading(false)
     }
@@ -1149,8 +1162,14 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
                       autoFocus
                     />
                     <button
-                      onClick={handleUpdateFridgeName}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        console.log('Save button clicked')
+                        handleUpdateFridgeName()
+                      }}
                       disabled={nameLoading || !fridgeName.trim()}
+                      type="button"
                       style={{
                         padding: '8px 16px',
                         backgroundColor: nameLoading || !fridgeName.trim() ? 'rgba(0, 0, 0, 0.12)' : '#6200ee',
