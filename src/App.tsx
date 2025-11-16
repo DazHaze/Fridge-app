@@ -2218,12 +2218,6 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
       </div>
 
     </div>
-    build
-Process completed with exit code 2.
-build: server/routes/auth.ts#L143
-Cannot assign to 'profile' because it is a constant.
-build: server/routes/auth.ts#L126
-Cannot redeclare block-scoped variable 'profile'.
       {/* Notification Sidebar */}
       <NotificationSidebar
         isOpen={isNotificationOpen}
