@@ -283,10 +283,20 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
       if (response.ok) {
         const responseData = await response.json()
         console.log('Response data:', responseData)
-        setIsEditingName(false)
-        // Update local state immediately with the new name from response
         const newName = responseData.fridge?.name || fridgeName.trim()
+        console.log('New name:', newName)
+        
+        // Update local state immediately with the new name from response
         setFridgeName(newName)
+        
+        // Also update localFridges immediately for instant UI update
+        setLocalFridges(prev => prev.map(f => 
+          f.fridgeId === fridgeId 
+            ? { ...f, name: newName }
+            : f
+        ))
+        
+        setIsEditingName(false)
         
         // Refresh fridge list to get updated name in tabs
         if (onRefreshFridges) {
