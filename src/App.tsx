@@ -238,10 +238,10 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
 
   // Sync local fridges state when allFridges prop changes
   useEffect(() => {
-    console.log('allFridges prop changed:', allFridges)
+    console.log('allFridges prop changed:', allFridges.map(f => ({ id: f.fridgeId, name: f.name })))
     // Create new objects to ensure React detects the change
     const newFridges = allFridges.map(f => ({ ...f }))
-    console.log('Setting localFridges to:', newFridges)
+    console.log('Setting localFridges to:', newFridges.map(f => ({ id: f.fridgeId, name: f.name })))
     setLocalFridges(newFridges)
   }, [allFridges])
 
@@ -298,7 +298,7 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
               ? { ...f, name: newName }
               : f
           )
-          console.log('Updated localFridges immediately:', updated)
+          console.log('Updated localFridges immediately:', updated.map(f => ({ id: f.fridgeId, name: f.name })))
           return updated
         })
         
@@ -2306,7 +2306,7 @@ function App() {
           members: [...fridge.members],
           createdAt: fridge.createdAt
         }))
-        console.log('Setting allFridges to:', newFridges)
+        console.log('Setting allFridges to:', newFridges.map((f: { fridgeId: string; name: string }) => ({ id: f.fridgeId, name: f.name })))
         setAllFridges(newFridges)
         // Set selected fridge to personal fridge if available, otherwise first fridge
         setSelectedFridgeId((current) => {
