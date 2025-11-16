@@ -92,6 +92,23 @@ const Login = () => {
 
         const userData = JSON.parse(jsonPayload)
         
+        // Check if user has an account before allowing Google sign-in
+        // Google sign-in should NOT automatically create accounts
+        try {
+          const accountCheckResponse = await fetch(getApiUrl(`invites/check-user/${userData.sub}`))
+          const accountCheckData = await accountCheckResponse.json().catch(() => ({}))
+          
+          if (!accountCheckData.hasAccount) {
+            // User does not have an account - prevent automatic account creation
+            alert('You must have an account to sign in with Google. Please sign up first using the Sign Up form.')
+            return
+          }
+        } catch (checkError) {
+          console.error('Error checking account:', checkError)
+          alert('Unable to verify account. Please try again or sign up first.')
+          return
+        }
+        
         // Check if email exists in User model (email/password accounts)
         try {
           const checkResponse = await fetch(getApiUrl(`auth/check-email/${encodeURIComponent(userData.email)}`))
@@ -115,6 +132,7 @@ const Login = () => {
         })
       } catch (error) {
         console.error('Error decoding credential:', error)
+        alert('Error processing Google sign-in. Please try again.')
       }
     }
 

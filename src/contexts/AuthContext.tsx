@@ -34,14 +34,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Check if user is already logged in (from localStorage)
-    const savedUser = localStorage.getItem('user')
+    // Clear all localStorage data (including old user data)
+    localStorage.clear()
+    
+    // Check if user is already logged in (from sessionStorage)
+    // sessionStorage persists on refresh but clears when tab is closed
+    const savedUser = sessionStorage.getItem('user')
     if (savedUser) {
       try {
         setUser(JSON.parse(savedUser))
       } catch (error) {
         console.error('Error parsing saved user:', error)
-        localStorage.removeItem('user')
+        sessionStorage.removeItem('user')
       }
     }
     setLoading(false)
@@ -49,12 +53,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const login = (userData: User) => {
     setUser(userData)
-    localStorage.setItem('user', JSON.stringify(userData))
+    sessionStorage.setItem('user', JSON.stringify(userData))
   }
 
   const logout = () => {
     setUser(null)
-    localStorage.removeItem('user')
+    sessionStorage.removeItem('user')
     // Sign out from Google
     if (window.google?.accounts?.id) {
       window.google.accounts.id.disableAutoSelect()
