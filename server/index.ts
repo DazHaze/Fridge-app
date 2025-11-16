@@ -6,6 +6,7 @@ import fridgeItemRoutes from './routes/fridgeItems.js'
 import fridgeRoutes from './routes/fridges.js'
 import inviteRoutes from './routes/invites.js'
 import authRoutes from './routes/auth.js'
+import notificationRoutes from './routes/notifications.js'
 
 dotenv.config()
 
@@ -75,6 +76,7 @@ app.use('/api/fridge-items', fridgeItemRoutes)
 app.use('/api/fridges', fridgeRoutes)
 app.use('/api/invites', inviteRoutes)
 app.use('/api/auth', authRoutes)
+app.use('/api/notifications', notificationRoutes)
 
 // MongoDB connection
 const connectDB = async () => {

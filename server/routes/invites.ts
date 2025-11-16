@@ -6,6 +6,7 @@ import Invite from '../models/Invite.js'
 import UserProfile from '../models/UserProfile.js'
 import Fridge from '../models/Fridge.js'
 import FridgeItem from '../models/FridgeItem.js'
+import { createFridgeInviteNotification } from '../utils/notificationHelper.js'
 
 const router = express.Router()
 
@@ -224,6 +225,21 @@ router.post('/', async (req: Request, res: Response) => {
       }
     } else {
       console.info(`Invite link (email not sent): ${acceptLink}`)
+    }
+
+    // Create notification for invitee if they have an account
+    if (emailCheck.hasAccount) {
+      // Find the invitee's user profile to get their userId
+      const inviteeProfile = await UserProfile.findOne({ email: normalizedEmail })
+      if (inviteeProfile) {
+        await createFridgeInviteNotification(
+          inviteeProfile.userId,
+          invite._id.toString(),
+          token,
+          fridgeName.trim(),
+          inviterProfile.name || 'Someone'
+        )
+      }
     }
 
     res.status(201).json({ message: 'Invite sent successfully', inviteId: invite._id })

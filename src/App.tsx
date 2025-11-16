@@ -3,10 +3,12 @@ import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-
 import './App.css'
 import { getApiUrl } from './config'
 import { useAuth } from './contexts/AuthContext'
+import { useNotifications } from './contexts/NotificationContext'
 import Login from './components/Login'
 import InviteUser from './components/InviteUser'
 import AcceptInvite from './components/AcceptInvite'
 import VerifyEmail from './components/VerifyEmail'
+import NotificationSidebar from './components/NotificationSidebar'
 
 interface FridgeItem {
   _id: string
@@ -26,8 +28,10 @@ interface FridgeAppProps {
 
 function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: FridgeAppProps) {
   const { user, logout } = useAuth()
+  const { unreadCount } = useNotifications()
   const userId = user?.sub || ''
   const navigate = useNavigate()
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false)
 
   // Format personal fridge name: "[name]'s" or "[name]'" if name ends with 's'
   const formatPersonalFridgeName = (name: string | undefined): string => {
@@ -186,6 +190,16 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
         const { active, expired } = separateItems(data)
         setItems(active)
         setBinItems(expired)
+      }
+      
+      // Check for expiring items and create notifications
+      try {
+        await fetch(getApiUrl('notifications/check-expiring-items'), {
+          method: 'POST'
+        })
+      } catch (error) {
+        // Silently fail - this is a background task
+        console.error('Error checking expiring items:', error)
       }
     } catch (error) {
       console.error('Error fetching items:', error)
@@ -568,8 +582,62 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
           Bia
         </h1>
         
-        <button
-          onClick={() => setIsMenuOpen(!isMenuOpen)}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {/* Notification Button */}
+          <button
+            onClick={() => setIsNotificationOpen(true)}
+            style={{
+              backgroundColor: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minWidth: '40px',
+              minHeight: '40px',
+              borderRadius: '50%',
+              transition: 'background-color 0.2s ease',
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+              position: 'relative'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.08)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent'
+            }}
+            aria-label="Notifications"
+          >
+            <span style={{ fontSize: '24px' }}>🔔</span>
+            {unreadCount > 0 && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '4px',
+                  right: '4px',
+                  backgroundColor: '#d32f2f',
+                  color: '#ffffff',
+                  borderRadius: '50%',
+                  width: '18px',
+                  height: '18px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '11px',
+                  fontWeight: '600',
+                  border: '2px solid #ffffff'
+                }}
+              >
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </button>
+
+          {/* Hamburger Menu Button */}
+          <button
+            onClick={() => setIsMenuOpen(!isMenuOpen)}
           style={{
             backgroundColor: 'transparent',
             border: 'none',
@@ -623,6 +691,7 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
             }}
           />
         </button>
+        </div>
       </nav>
 
       {/* Fridge Tabs */}
@@ -1719,6 +1788,12 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
         Clear Fridge
       </button>
     </div>
+
+      {/* Notification Sidebar */}
+      <NotificationSidebar
+        isOpen={isNotificationOpen}
+        onClose={() => setIsNotificationOpen(false)}
+      />
     </>
   )
 }

@@ -4,6 +4,7 @@ import nodemailer from 'nodemailer'
 import User from '../models/User.js'
 import UserProfile from '../models/UserProfile.js'
 import Fridge from '../models/Fridge.js'
+import { createAccountCreatedNotification } from '../utils/notificationHelper.js'
 
 const router = express.Router()
 
@@ -277,6 +278,9 @@ router.post('/google-signup', async (req: Request, res: Response) => {
       name: name.trim(),
       fridgeId: fridge._id
     })
+
+    // Create account created notification
+    await createAccountCreatedNotification(userId)
 
     res.status(201).json({
       message: 'Google account created successfully',

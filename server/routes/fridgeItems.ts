@@ -3,6 +3,7 @@ import mongoose from 'mongoose'
 import FridgeItem from '../models/FridgeItem.js'
 import UserProfile from '../models/UserProfile.js'
 import Fridge from '../models/Fridge.js'
+import { createFirstItemNotification } from '../utils/notificationHelper.js'
 
 const router = express.Router()
 
@@ -146,6 +147,16 @@ router.post('/', async (req: Request, res: Response) => {
     })
 
     const savedItem = await newItem.save()
+
+    // Check if this is the first item for this user in this fridge
+    if (userId) {
+      const itemCount = await FridgeItem.countDocuments({ fridgeId, userId })
+      if (itemCount === 1) {
+        // This is the first item - create notification
+        await createFirstItemNotification(userId, fridgeId, savedItem._id.toString())
+      }
+    }
+
     res.status(201).json(savedItem)
   } catch (error) {
     console.error('Error saving item to database:', error)
