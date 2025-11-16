@@ -1569,7 +1569,7 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
             letterSpacing: '0.15px'
           }}
         >
-          Bin
+          Expired
         </h2>
         
         <div
