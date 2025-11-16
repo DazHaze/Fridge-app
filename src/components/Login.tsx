@@ -92,44 +92,83 @@ const Login = () => {
 
         const userData = JSON.parse(jsonPayload)
         
-        // Check if user has an account before allowing Google sign-in
-        // Google sign-in should NOT automatically create accounts
+        // Check if user has an account
         try {
           const accountCheckResponse = await fetch(getApiUrl(`invites/check-user/${userData.sub}`))
           const accountCheckData = await accountCheckResponse.json().catch(() => ({}))
           
           if (!accountCheckData.hasAccount) {
-            // User does not have an account - prevent automatic account creation
-            alert('You must have an account to sign in with Google. Please sign up first using the Sign Up form.')
-            return
+            // User does not have an account
+            if (isSignup) {
+              // On signup page - create account for Google user
+              try {
+                const signupResponse = await fetch(getApiUrl('auth/google-signup'), {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({
+                    userId: userData.sub,
+                    email: userData.email,
+                    name: userData.name,
+                    picture: userData.picture
+                  })
+                })
+
+                const signupData = await signupResponse.json()
+
+                if (signupResponse.ok) {
+                  // Account created successfully - now log them in
+                  login({
+                    name: userData.name,
+                    email: userData.email,
+                    picture: userData.picture,
+                    sub: userData.sub
+                  })
+                } else {
+                  // Account creation failed
+                  alert(signupData.message || 'Failed to create account. Please try again.')
+                  return
+                }
+              } catch (signupError) {
+                console.error('Error creating Google account:', signupError)
+                alert('Failed to create account. Please try again.')
+                return
+              }
+            } else {
+              // On login page - require existing account
+              alert('You must have an account to sign in with Google. Please sign up first using the Sign Up form.')
+              return
+            }
+          } else {
+            // User has an account - proceed with login
+            // Check if email exists in User model (email/password accounts)
+            try {
+              const checkResponse = await fetch(getApiUrl(`auth/check-email/${encodeURIComponent(userData.email)}`))
+              const checkData = await checkResponse.json()
+              
+              if (checkData.exists && !checkData.hasGmailAccount) {
+                // Email exists but is not a Gmail account - it's an email/password account
+                alert('This email is already registered with an email/password account. Please sign in with your password instead.')
+                return
+              }
+            } catch (checkError) {
+              console.error('Error checking email:', checkError)
+              // Continue with Google login if check fails
+            }
+            
+            login({
+              name: userData.name,
+              email: userData.email,
+              picture: userData.picture,
+              sub: userData.sub
+            })
           }
         } catch (checkError) {
           console.error('Error checking account:', checkError)
-          alert('Unable to verify account. Please try again or sign up first.')
+          alert('Unable to verify account. Please try again.')
           return
         }
-        
-        // Check if email exists in User model (email/password accounts)
-        try {
-          const checkResponse = await fetch(getApiUrl(`auth/check-email/${encodeURIComponent(userData.email)}`))
-          const checkData = await checkResponse.json()
-          
-          if (checkData.exists && !checkData.hasGmailAccount) {
-            // Email exists but is not a Gmail account - it's an email/password account
-            alert('This email is already registered with an email/password account. Please sign in with your password instead.')
-            return
-          }
-        } catch (checkError) {
-          console.error('Error checking email:', checkError)
-          // Continue with Google login if check fails
-        }
-        
-        login({
-          name: userData.name,
-          email: userData.email,
-          picture: userData.picture,
-          sub: userData.sub
-        })
       } catch (error) {
         console.error('Error decoding credential:', error)
         alert('Error processing Google sign-in. Please try again.')
@@ -195,7 +234,7 @@ const Login = () => {
         clearInterval(checkInterval)
       }
     }
-  }, [login])
+  }, [login, isSignup])
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()

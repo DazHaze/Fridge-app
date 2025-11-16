@@ -227,6 +227,71 @@ router.get('/verify-email', async (req: Request, res: Response) => {
   }
 })
 
+// Google Signup (create account for Google users)
+router.post('/google-signup', async (req: Request, res: Response) => {
+  const connectionCheck = ensureMongoConnected()
+  if (!connectionCheck.connected) {
+    return res.status(503).json({ message: connectionCheck.message })
+  }
+
+  try {
+    const { userId, email, name, picture } = req.body as { userId?: string; email?: string; name?: string; picture?: string }
+
+    if (!userId || !email || !name) {
+      return res.status(400).json({ message: 'userId, email, and name are required' })
+    }
+
+    const normalizedEmail = email.toLowerCase().trim()
+
+    // Check if user already has an account
+    let profile = await UserProfile.findOne({ userId })
+    if (profile) {
+      return res.status(400).json({ message: 'Account already exists. Please sign in instead.' })
+    }
+
+    // Check if email is already registered with a different account type
+    const User = (await import('../models/User.js')).default
+    const existingUser = await User.findOne({ email: normalizedEmail })
+    if (existingUser) {
+      return res.status(400).json({ message: 'This email is already registered with an email/password account. Please sign in with your password instead.' })
+    }
+
+    // Check if email is already linked to a different Google account
+    const existingProfile = await UserProfile.findOne({ email: normalizedEmail })
+    if (existingProfile) {
+      return res.status(400).json({ message: 'This email is already linked to a Google account. Please sign in with Google instead.' })
+    }
+
+    // Create personal fridge for user
+    const fridge = await Fridge.create({
+      members: [userId],
+      name: name.trim().toLowerCase().endsWith('s') 
+        ? `${name.trim()}' Fridge` 
+        : `${name.trim()}'s Fridge`
+    })
+
+    // Create user profile
+    profile = await UserProfile.create({
+      userId,
+      email: normalizedEmail,
+      name: name.trim(),
+      fridgeId: fridge._id
+    })
+
+    res.status(201).json({
+      message: 'Google account created successfully',
+      userId,
+      fridgeId: (fridge._id as mongoose.Types.ObjectId).toString()
+    })
+  } catch (error) {
+    console.error('Error creating Google account:', error)
+    if ((error as any).code === 11000) {
+      return res.status(400).json({ message: 'Account already exists' })
+    }
+    res.status(500).json({ message: 'Error creating Google account', error: String(error) })
+  }
+})
+
 // Login
 router.post('/login', async (req: Request, res: Response) => {
   const connectionCheck = ensureMongoConnected()
