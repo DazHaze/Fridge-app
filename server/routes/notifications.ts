@@ -289,4 +289,25 @@ router.delete('/:notificationId', async (req: Request, res: Response) => {
   }
 })
 
+// Delete all notifications for a user
+router.delete('/user/:userId/all', async (req: Request, res: Response) => {
+  const connectionCheck = ensureMongoConnected()
+  if (!connectionCheck.connected) {
+    return res.status(503).json({ message: connectionCheck.message })
+  }
+
+  try {
+    const { userId } = req.params
+    const result = await Notification.deleteMany({ userId })
+
+    res.json({ 
+      message: 'All notifications deleted successfully',
+      deletedCount: result.deletedCount 
+    })
+  } catch (error) {
+    console.error('Error deleting all notifications:', error)
+    res.status(500).json({ message: 'Error deleting all notifications', error: String(error) })
+  }
+})
+
 export default router

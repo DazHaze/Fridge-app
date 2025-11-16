@@ -27,6 +27,7 @@ interface NotificationContextType {
   markAsRead: (notificationId: string) => Promise<void>
   markAllAsRead: () => Promise<void>
   deleteNotification: (notificationId: string) => Promise<void>
+  clearAllNotifications: () => Promise<void>
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined)
@@ -149,6 +150,23 @@ export const NotificationProvider = ({ children }: NotificationProviderProps) =>
     }
   }, [notifications])
 
+  const clearAllNotifications = useCallback(async () => {
+    if (!user?.sub) return
+
+    try {
+      const response = await fetch(getApiUrl(`notifications/user/${user.sub}/all`), {
+        method: 'DELETE'
+      })
+
+      if (response.ok) {
+        setNotifications([])
+        setUnreadCount(0)
+      }
+    } catch (error) {
+      console.error('Error clearing all notifications:', error)
+    }
+  }, [user?.sub])
+
   useEffect(() => {
     fetchNotifications()
     
@@ -169,7 +187,8 @@ export const NotificationProvider = ({ children }: NotificationProviderProps) =>
         refreshNotifications,
         markAsRead,
         markAllAsRead,
-        deleteNotification
+        deleteNotification,
+        clearAllNotifications
       }}
     >
       {children}

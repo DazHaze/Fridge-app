@@ -1,6 +1,7 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useNotifications } from '../contexts/NotificationContext'
+import { Spinner } from '@/components/ui/spinner'
 
 interface NotificationSidebarProps {
   isOpen: boolean
@@ -8,8 +9,9 @@ interface NotificationSidebarProps {
 }
 
 const NotificationSidebar = ({ isOpen, onClose }: NotificationSidebarProps) => {
-  const { notifications, markAsRead, markAllAsRead, deleteNotification } = useNotifications()
+  const { notifications, markAsRead, markAllAsRead, deleteNotification, clearAllNotifications } = useNotifications()
   const navigate = useNavigate()
+  const [isClearing, setIsClearing] = useState(false)
 
   useEffect(() => {
     if (isOpen) {
@@ -130,7 +132,45 @@ const NotificationSidebar = ({ isOpen, onClose }: NotificationSidebarProps) => {
           >
             Notifications
           </h2>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {notifications.length > 0 && (
+              <button
+                onClick={async () => {
+                  setIsClearing(true)
+                  await clearAllNotifications()
+                  setIsClearing(false)
+                }}
+                disabled={isClearing}
+                style={{
+                  padding: '6px 12px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  color: '#d32f2f',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: isClearing ? 'not-allowed' : 'pointer',
+                  borderRadius: '4px',
+                  transition: 'background-color 0.2s ease',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  opacity: isClearing ? 0.6 : 1
+                }}
+                onMouseEnter={(e) => {
+                  if (!isClearing) {
+                    e.currentTarget.style.backgroundColor = 'rgba(211, 47, 47, 0.08)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isClearing) {
+                    e.currentTarget.style.backgroundColor = 'transparent'
+                  }
+                }}
+              >
+                {isClearing ? <Spinner size="sm" /> : null}
+                Clear all
+              </button>
+            )}
             {notifications.some(n => !n.read) && (
               <button
                 onClick={markAllAsRead}
