@@ -103,8 +103,8 @@ router.post('/signup', async (req: Request, res: Response) => {
     }
 
     // Check if email is linked to Gmail account
-    const profile = await UserProfile.findOne({ email: normalizedEmail })
-    if (profile) {
+    const existingGmailProfile = await UserProfile.findOne({ email: normalizedEmail })
+    if (existingGmailProfile) {
       return res.status(400).json({ message: 'This email is already linked to a Gmail account. Please sign in with Google.' })
     }
 
