@@ -28,7 +28,7 @@ const clearSharedFridges = async () => {
     // Find all fridges that are NOT personal fridges
     const allFridges = await Fridge.find({})
     const sharedFridges = allFridges.filter(
-      fridge => !personalFridgeIds.includes(fridge._id.toString())
+      fridge => !personalFridgeIds.includes((fridge._id as mongoose.Types.ObjectId).toString())
     )
 
     console.log(`Found ${sharedFridges.length} shared fridges to delete`)
@@ -41,7 +41,7 @@ const clearSharedFridges = async () => {
 
     // Delete associated data
     for (const fridge of sharedFridges) {
-      const fridgeId = fridge._id
+      const fridgeId = fridge._id as mongoose.Types.ObjectId
 
       // Delete fridge items
       const itemsResult = await FridgeItem.deleteMany({ fridgeId })
