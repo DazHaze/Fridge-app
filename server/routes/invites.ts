@@ -65,30 +65,28 @@ router.post('/', async (req: Request, res: Response) => {
       return res.status(404).json({ message: 'Inviter profile not found' })
     }
 
-    let fridge = await Fridge.findById(inviterProfile.fridgeId)
-    if (!fridge) {
-      return res.status(404).json({ message: 'Fridge not found for inviter' })
+    // fridgeName is required when creating a shared fridge
+    if (!fridgeName || !fridgeName.trim()) {
+      return res.status(400).json({ message: 'fridgeName is required when creating a shared fridge' })
     }
 
-    // If fridgeName is provided, create a new shared fridge
-    if (fridgeName && fridgeName.trim()) {
-      const oldFridgeId = inviterProfile.fridgeId
-      const newFridge = await Fridge.create({
-        members: [inviterId],
-        name: fridgeName.trim()
-      })
-      fridge = newFridge
-      
-      // Move inviter's items to the new fridge
-      await FridgeItem.updateMany(
-        { fridgeId: oldFridgeId },
-        { fridgeId: newFridge._id }
-      )
-      
-      // Update inviter's profile to point to the new shared fridge
-      inviterProfile.fridgeId = newFridge._id as mongoose.Types.ObjectId
-      await inviterProfile.save()
-    }
+    const oldFridgeId = inviterProfile.fridgeId
+    // Create a new shared fridge with the provided name
+    const newFridge = await Fridge.create({
+      members: [inviterId],
+      name: fridgeName.trim()
+    })
+    const fridge = newFridge
+    
+    // Move inviter's items to the new shared fridge
+    await FridgeItem.updateMany(
+      { fridgeId: oldFridgeId },
+      { fridgeId: newFridge._id }
+    )
+    
+    // Update inviter's profile to point to the new shared fridge
+    inviterProfile.fridgeId = newFridge._id as mongoose.Types.ObjectId
+    await inviterProfile.save()
 
     const token = crypto.randomUUID()
     const expiryHours = Number(process.env.INVITE_EXPIRY_HOURS || 72)

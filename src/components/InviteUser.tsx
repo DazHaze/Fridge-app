@@ -30,6 +30,12 @@ const InviteUser = ({ fridgeId }: InviteUserProps) => {
       return
     }
 
+    if (!fridgeName || !fridgeName.trim()) {
+      setStatus('error')
+      setMessage('Please enter a name for the shared fridge.')
+      return
+    }
+
     setStatus('loading')
     setMessage(null)
     setInviteLink(null)
@@ -44,7 +50,7 @@ const InviteUser = ({ fridgeId }: InviteUserProps) => {
           inviterId: user.sub,
           inviteeEmail: email,
           fridgeId,
-          fridgeName: fridgeName.trim() || undefined
+          fridgeName: fridgeName.trim()
         })
       })
 
@@ -152,13 +158,14 @@ const InviteUser = ({ fridgeId }: InviteUserProps) => {
               fontSize: '14px'
             }}
           >
-            Shared Fridge Name (optional)
+            Shared Fridge Name
             <input
               id="invite-fridge-name"
               type="text"
               value={fridgeName}
               onChange={(event) => setFridgeName(event.target.value)}
               placeholder="e.g., Family Fridge, Roommate Fridge"
+              required
               style={{
                 width: '100%',
                 padding: '12px 16px',

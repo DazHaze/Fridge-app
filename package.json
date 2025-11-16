@@ -17,7 +17,8 @@
     "start": "node dist/server/index.js",
     "dev:all": "concurrently \"npm run server\" \"npm run dev\"",
     "postinstall": "npm run build:server",
-    "heroku-postbuild": "npm run build:server"
+    "heroku-postbuild": "npm run build:server",
+    "clear-shared-fridges": "tsx server/scripts/clearSharedFridges.ts"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
