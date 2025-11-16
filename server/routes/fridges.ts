@@ -22,6 +22,16 @@ const formatPersonalFridgeName = (name: string): string => {
   return `${trimmedName}'s Fridge`
 }
 
+// Helper function to check if user has an account
+const checkUserHasAccount = async (userId: string): Promise<boolean> => {
+  const profile = await UserProfile.findOne({ userId })
+  if (profile) return true
+  
+  const User = (await import('../models/User.js')).default
+  const user = await User.findById(userId)
+  return !!user
+}
+
 router.post('/ensure', async (req: Request, res: Response) => {
   const connectionCheck = ensureMongoConnected()
   if (!connectionCheck.connected) {
@@ -33,6 +43,23 @@ router.post('/ensure', async (req: Request, res: Response) => {
 
     if (!userId) {
       return res.status(400).json({ message: 'userId is required' })
+    }
+
+    // Check if user has an account (either Gmail or email/password)
+    const hasAccount = await checkUserHasAccount(userId)
+    if (!hasAccount && email) {
+      // User doesn't have account but provided email - check if email exists
+      const normalizedEmail = email.toLowerCase().trim()
+      const profile = await UserProfile.findOne({ email: normalizedEmail })
+      const User = (await import('../models/User.js')).default
+      const user = await User.findOne({ email: normalizedEmail })
+      
+      if (!profile && !user) {
+        return res.status(403).json({ 
+          message: 'Account not found. Please sign up first.',
+          needsSignup: true
+        })
+      }
     }
 
     let profile = await UserProfile.findOne({ userId })

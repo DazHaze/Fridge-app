@@ -6,6 +6,7 @@ export interface IInvite extends Document {
   inviterId: string
   inviteeEmail: string
   token: string
+  inviteType: 'fridge' | 'account'
   status: 'pending' | 'accepted' | 'expired'
   expiresAt: Date
   createdAt: Date
@@ -39,6 +40,11 @@ const InviteSchema: Schema = new Schema(
       required: true,
       unique: true,
       index: true
+    },
+    inviteType: {
+      type: String,
+      enum: ['fridge', 'account'],
+      default: 'fridge'
     },
     status: {
       type: String,

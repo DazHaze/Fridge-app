@@ -18,7 +18,8 @@
     "dev:all": "concurrently \"npm run server\" \"npm run dev\"",
     "postinstall": "npm run build:server",
     "heroku-postbuild": "npm run build:server",
-    "clear-shared-fridges": "tsx server/scripts/clearSharedFridges.ts"
+    "clear-shared-fridges": "tsx server/scripts/clearSharedFridges.ts",
+    "clear-all-data": "tsx server/scripts/clearAllData.ts"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

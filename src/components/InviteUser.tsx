@@ -15,6 +15,8 @@ const InviteUser = ({ fridgeId }: InviteUserProps) => {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
   const [message, setMessage] = useState<string | null>(null)
   const [inviteLink, setInviteLink] = useState<string | null>(null)
+  const [showAccountInviteDialog, setShowAccountInviteDialog] = useState(false)
+  const [accountInviteLoading, setAccountInviteLoading] = useState(false)
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -57,6 +59,13 @@ const InviteUser = ({ fridgeId }: InviteUserProps) => {
       const data = await response.json().catch(() => ({}))
 
       if (response.ok) {
+        // Check if email doesn't have an account
+        if (data.hasAccount === false) {
+          setStatus('idle')
+          setShowAccountInviteDialog(true)
+          return
+        }
+
         setStatus('success')
         setMessage('Invitation sent successfully!')
         if (data?.acceptLink) {
@@ -75,6 +84,47 @@ const InviteUser = ({ fridgeId }: InviteUserProps) => {
       console.error('Error sending invite:', error)
       setStatus('error')
       setMessage('An unexpected error occurred. Please try again.')
+    }
+  }
+
+  const handleSendAccountInvite = async () => {
+    if (!user?.sub) return
+
+    setAccountInviteLoading(true)
+    setMessage(null)
+
+    try {
+      const response = await fetch(getApiUrl('invites/account-invite'), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          inviterId: user.sub,
+          inviteeEmail: email,
+          fridgeName: fridgeName.trim()
+        })
+      })
+
+      const data = await response.json().catch(() => ({}))
+
+      if (response.ok) {
+        setStatus('success')
+        setMessage('Account creation invite sent successfully!')
+        setShowAccountInviteDialog(false)
+        setEmail('')
+        setFridgeName('')
+        if (data?.signupLink) {
+          setInviteLink(data.signupLink)
+        }
+      } else {
+        setMessage(data?.message || 'Failed to send account invite. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error sending account invite:', error)
+      setMessage('An unexpected error occurred. Please try again.')
+    } finally {
+      setAccountInviteLoading(false)
     }
   }
 
@@ -304,6 +354,96 @@ const InviteUser = ({ fridgeId }: InviteUserProps) => {
           </div>
         )}
       </div>
+
+      {/* Account Invite Dialog */}
+      {showAccountInviteDialog && (
+        <>
+          <div
+            onClick={() => setShowAccountInviteDialog(false)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              zIndex: 1000,
+              backdropFilter: 'blur(2px)'
+            }}
+          />
+          <div
+            style={{
+              position: 'fixed',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              backgroundColor: '#ffffff',
+              borderRadius: '8px',
+              padding: '24px',
+              maxWidth: '420px',
+              width: '90%',
+              zIndex: 1001,
+              boxShadow: '0 11px 15px -7px rgba(0, 0, 0, 0.2), 0 24px 38px 3px rgba(0, 0, 0, 0.14), 0 9px 46px 8px rgba(0, 0, 0, 0.12)'
+            }}
+          >
+            <h3
+              style={{
+                margin: '0 0 16px 0',
+                color: 'rgba(0, 0, 0, 0.87)',
+                fontSize: '20px',
+                fontWeight: '500'
+              }}
+            >
+              Account Required
+            </h3>
+            <p style={{ color: 'rgba(0, 0, 0, 0.6)', fontSize: '14px', marginBottom: '24px' }}>
+              This email address does not have a Bia Fridge account. Would you like to send them an invite to create one? They'll be able to join your shared fridge after signing up.
+            </p>
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => {
+                  setShowAccountInviteDialog(false)
+                  setStatus('idle')
+                }}
+                disabled={accountInviteLoading}
+                style={{
+                  padding: '10px 16px',
+                  backgroundColor: 'transparent',
+                  color: '#6200ee',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: accountInviteLoading ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px'
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSendAccountInvite}
+                disabled={accountInviteLoading}
+                style={{
+                  padding: '10px 16px',
+                  backgroundColor: accountInviteLoading ? 'rgba(98, 0, 238, 0.38)' : '#6200ee',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: accountInviteLoading ? 'not-allowed' : 'pointer',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.2), 0 4px 5px 0 rgba(0, 0, 0, 0.14), 0 1px 10px 0 rgba(0, 0, 0, 0.12)'
+                }}
+              >
+                {accountInviteLoading ? 'Sending...' : 'Send Account Invite'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }

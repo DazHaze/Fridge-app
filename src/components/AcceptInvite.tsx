@@ -26,6 +26,19 @@ const AcceptInvite = ({ isAuthenticated, ensureFridge, onAccept }: AcceptInviteP
     setMessage('Accepting your invitation...')
 
     try {
+      // First check if user has an account
+      const accountCheckResponse = await fetch(getApiUrl(`invites/check-user/${user.sub}`))
+      const accountCheckData = await accountCheckResponse.json().catch(() => ({}))
+
+      if (!accountCheckData.hasAccount) {
+        setStatus('error')
+        setMessage('You must have an account to accept invites. Please sign up first.')
+        setTimeout(() => {
+          navigate('/login?signup=true', { replace: true })
+        }, 2000)
+        return
+      }
+
       const response = await fetch(getApiUrl('invites/accept'), {
         method: 'POST',
         headers: {

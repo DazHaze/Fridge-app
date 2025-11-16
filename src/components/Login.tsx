@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { getApiUrl } from '../config'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 
 declare global {
   interface Window {
@@ -29,7 +29,10 @@ const Login = () => {
   const { login } = useAuth()
   const navigate = useNavigate()
   const buttonRef = useRef<HTMLDivElement>(null)
-  const [isSignup, setIsSignup] = useState(false)
+  const [searchParams] = useSearchParams()
+  const inviteToken = searchParams.get('inviteToken')
+  const shouldSignup = searchParams.get('signup') === 'true'
+  const [isSignup, setIsSignup] = useState(shouldSignup || false)
   const [buttonLoading, setButtonLoading] = useState(true)
   const [buttonError, setButtonError] = useState(false)
   
@@ -41,6 +44,23 @@ const Login = () => {
   const [signupLoading, setSignupLoading] = useState(false)
   const [signupError, setSignupError] = useState<string | null>(null)
   const [signupSuccess, setSignupSuccess] = useState(false)
+
+  // Fetch invite email if inviteToken is present
+  useEffect(() => {
+    if (inviteToken && shouldSignup) {
+      // Fetch invite details to pre-fill email
+      fetch(getApiUrl(`invites/info/${inviteToken}`))
+        .then(res => res.json())
+        .then(data => {
+          if (data.email) {
+            setSignupEmail(data.email)
+          }
+        })
+        .catch(err => {
+          console.error('Error fetching invite info:', err)
+        })
+    }
+  }, [inviteToken, shouldSignup])
   
   // Login form state
   const [loginEmail, setLoginEmail] = useState('')
@@ -223,6 +243,39 @@ const Login = () => {
 
       if (response.ok) {
         setSignupSuccess(true)
+        
+        // If there's an invite token, handle the account creation invite
+        if (inviteToken) {
+          try {
+            // After account creation, accept the account invite which will create the fridge invite
+            const inviteResponse = await fetch(getApiUrl('invites/accept-account-invite'), {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                token: inviteToken,
+                userId: data.userId,
+                email: signupEmail.trim(),
+                name: signupName.trim()
+              })
+            })
+            
+            const inviteData = await inviteResponse.json().catch(() => ({}))
+            if (inviteResponse.ok && inviteData.fridgeId) {
+              // Account created and fridge invite accepted - user can now login
+              setTimeout(() => {
+                setIsSignup(false)
+                setSignupSuccess(false)
+              }, 2000)
+            }
+          } catch (inviteError) {
+            console.error('Error accepting account invite:', inviteError)
+            // Account was created successfully, but invite handling failed
+            // User can still login and accept invite manually
+          }
+        }
+        
         setSignupName('')
         setSignupEmail('')
         setSignupPassword('')

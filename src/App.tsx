@@ -261,6 +261,20 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
       return
     }
 
+    // Check if user has an account before updating items
+    try {
+      const accountCheckResponse = await fetch(getApiUrl(`invites/check-user/${userId}`))
+      const accountCheckData = await accountCheckResponse.json().catch(() => ({}))
+      
+      if (!accountCheckData.hasAccount) {
+        alert('You must have an account to update items. Please sign up first.')
+        navigate('/login?signup=true')
+        return
+      }
+    } catch (error) {
+      console.error('Error checking account:', error)
+    }
+
     try {
       const updateData: any = {
         name: capitalizeName(itemName.trim()),
@@ -341,6 +355,21 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
       alert('You must be signed in to add items.')
       return
     }
+
+    // Check if user has an account before adding items
+    try {
+      const accountCheckResponse = await fetch(getApiUrl(`invites/check-user/${userId}`))
+      const accountCheckData = await accountCheckResponse.json().catch(() => ({}))
+      
+      if (!accountCheckData.hasAccount) {
+        alert('You must have an account to add items. Please sign up first.')
+        navigate('/login?signup=true')
+        return
+      }
+    } catch (error) {
+      console.error('Error checking account:', error)
+    }
+
     try {
       const response = await fetch(getApiUrl('fridge-items'), {
         method: 'POST',
@@ -398,6 +427,21 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
       alert('You must be signed in to delete items.')
       return
     }
+
+    // Check if user has an account before deleting items
+    try {
+      const accountCheckResponse = await fetch(getApiUrl(`invites/check-user/${userId}`))
+      const accountCheckData = await accountCheckResponse.json().catch(() => ({}))
+      
+      if (!accountCheckData.hasAccount) {
+        alert('You must have an account to delete items. Please sign up first.')
+        navigate('/login?signup=true')
+        return
+      }
+    } catch (error) {
+      console.error('Error checking account:', error)
+    }
+
     try {
       const params = new URLSearchParams({
         fridgeId,
@@ -438,6 +482,20 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
     }
     if (!window.confirm('Are you sure you want to clear all items from the fridge? This cannot be undone.')) {
       return
+    }
+
+    // Check if user has an account before clearing fridge
+    try {
+      const accountCheckResponse = await fetch(getApiUrl(`invites/check-user/${userId}`))
+      const accountCheckData = await accountCheckResponse.json().catch(() => ({}))
+      
+      if (!accountCheckData.hasAccount) {
+        alert('You must have an account to clear fridge. Please sign up first.')
+        navigate('/login?signup=true')
+        return
+      }
+    } catch (error) {
+      console.error('Error checking account:', error)
     }
 
     try {
@@ -1684,6 +1742,7 @@ function LoadingScreen({ message }: { message: string }) {
 function App() {
   const { isAuthenticated, loading, user } = useAuth()
   const location = useLocation()
+  const navigate = useNavigate()
   const [fridgeId, setFridgeId] = useState<string | null>(null)
   const [selectedFridgeId, setSelectedFridgeId] = useState<string | null>(null)
   const [allFridges, setAllFridges] = useState<Array<{ fridgeId: string; name: string; isPersonal: boolean }>>([])
@@ -1695,6 +1754,19 @@ function App() {
     }
 
     try {
+      // First check if user has an account
+      const accountCheckResponse = await fetch(getApiUrl(`invites/check-user/${user.sub}`))
+      const accountCheckData = await accountCheckResponse.json().catch(() => ({}))
+
+      if (!accountCheckData.hasAccount) {
+        console.warn('User does not have an account')
+        // Redirect to signup if account doesn't exist
+        if (user.email) {
+          navigate('/login?signup=true', { replace: true })
+        }
+        return null
+      }
+
       const response = await fetch(getApiUrl('fridges/ensure'), {
         method: 'POST',
         headers: {
@@ -1712,14 +1784,18 @@ function App() {
         setFridgeId(data.fridgeId)
         return data.fridgeId
       } else {
-        console.error('Failed to ensure fridge:', response.status)
+        const errorData = await response.json().catch(() => ({}))
+        if (errorData.needsSignup) {
+          navigate('/login?signup=true', { replace: true })
+        }
+        console.error('Failed to ensure fridge:', response.status, errorData)
       }
     } catch (error) {
       console.error('Error ensuring fridge:', error)
     }
 
     return null
-  }, [user?.sub, user?.email, user?.name])
+  }, [user?.sub, user?.email, user?.name, navigate])
 
   const fetchAllFridges = useCallback(async () => {
     if (!user?.sub) return

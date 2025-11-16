@@ -13,6 +13,17 @@ const checkConnection = () => {
   return { connected: true }
 }
 
+// Helper function to check if user has an account
+const checkUserHasAccount = async (userId: string): Promise<boolean> => {
+  const UserProfile = (await import('../models/UserProfile.js')).default
+  const profile = await UserProfile.findOne({ userId })
+  if (profile) return true
+  
+  const User = (await import('../models/User.js')).default
+  const user = await User.findById(userId)
+  return !!user
+}
+
 const resolveFridgeContext = async (userId?: string, fridgeId?: string) => {
   if (fridgeId) {
     return fridgeId
@@ -53,6 +64,14 @@ router.get('/', async (req: Request, res: Response) => {
 
     if (!userId && !fridgeIdParam) {
       return res.status(400).json({ message: 'userId or fridgeId is required' })
+    }
+
+    // Verify user has an account if userId is provided
+    if (userId) {
+      const hasAccount = await checkUserHasAccount(userId)
+      if (!hasAccount) {
+        return res.status(403).json({ message: 'You must have an account to access fridge items. Please sign up first.' })
+      }
     }
 
     const fridgeId = await resolveFridgeContext(userId, fridgeIdParam)
@@ -97,6 +116,14 @@ router.post('/', async (req: Request, res: Response) => {
 
     if (!name || !expiryDate || (!userId && !fridgeIdInput)) {
       return res.status(400).json({ message: 'Name, expiry date, and userId or fridgeId are required' })
+    }
+
+    // Verify user has an account if userId is provided
+    if (userId) {
+      const hasAccount = await checkUserHasAccount(userId)
+      if (!hasAccount) {
+        return res.status(403).json({ message: 'You must have an account to add items. Please sign up first.' })
+      }
     }
 
     const fridgeId = await resolveFridgeContext(userId, fridgeIdInput)
@@ -149,6 +176,14 @@ router.put('/:id', async (req: Request, res: Response) => {
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: 'Invalid item ID format' })
+    }
+
+    // Verify user has an account if userId is provided
+    if (userId) {
+      const hasAccount = await checkUserHasAccount(userId)
+      if (!hasAccount) {
+        return res.status(403).json({ message: 'You must have an account to update items. Please sign up first.' })
+      }
     }
 
     const fridgeId = await resolveFridgeContext(userId, fridgeIdInput)
@@ -206,6 +241,14 @@ router.delete('/:id', async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'userId or fridgeId is required' })
     }
 
+    // Verify user has an account if userId is provided
+    if (userId) {
+      const hasAccount = await checkUserHasAccount(userId)
+      if (!hasAccount) {
+        return res.status(403).json({ message: 'You must have an account to delete items. Please sign up first.' })
+      }
+    }
+
     const fridgeId = await resolveFridgeContext(userId, fridgeIdInput)
 
     if (userId) {
@@ -241,6 +284,14 @@ router.delete('/', async (req: Request, res: Response) => {
 
     if (!userId && !fridgeIdInput) {
       return res.status(400).json({ message: 'userId or fridgeId is required' })
+    }
+
+    // Verify user has an account if userId is provided
+    if (userId) {
+      const hasAccount = await checkUserHasAccount(userId)
+      if (!hasAccount) {
+        return res.status(403).json({ message: 'You must have an account to clear fridge. Please sign up first.' })
+      }
     }
 
     const fridgeId = await resolveFridgeContext(userId, fridgeIdInput)
