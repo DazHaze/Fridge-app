@@ -1002,7 +1002,8 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
             return 0
           }).map((fridge) => {
             const isActive = fridge.fridgeId === fridgeId
-            const displayName = fridge.isPersonal ? formatPersonalFridgeName(user?.name) : (fridge.name || 'Unnamed Fridge')
+            // Use fridge.name if it exists, otherwise use formatted personal name for personal fridges
+            const displayName = fridge.name || (fridge.isPersonal ? formatPersonalFridgeName(user?.name) : 'Unnamed Fridge')
             // Log to verify tabs are rendering with correct names
             if (fridge.fridgeId === fridgeId) {
               console.log('Rendering tab for current fridge:', { fridgeId: fridge.fridgeId, name: fridge.name, displayName, isPersonal: fridge.isPersonal })
