@@ -11,14 +11,20 @@ declare global {
           initialize: (config: {
             client_id: string
             callback: (response: { credential: string }) => void
+            auto_select?: boolean
+            cancel_on_tap_outside?: boolean
+            itp_support?: boolean
           }) => void
           renderButton: (element: HTMLElement, config: {
             theme: string
             size: string
             width?: number
+            text?: string
+            shape?: string
           }) => void
           prompt: () => void
           disableAutoSelect: () => void
+          storeCredential: (credentials: { id: string; password: string }, callback: () => void) => void
         }
       }
     }
@@ -83,6 +89,11 @@ const Login = () => {
       setButtonError(true)
       setButtonLoading(false)
       return
+    }
+
+    // Disable auto-select immediately if Google script is already loaded
+    if (window.google?.accounts?.id) {
+      window.google.accounts.id.disableAutoSelect()
     }
 
     const handleCredentialResponse = async (response: { credential: string }) => {
@@ -190,14 +201,24 @@ const Login = () => {
           // Clear any existing button before re-rendering
           buttonRef.current.innerHTML = ''
           
+          // Disable auto-select to prevent showing pre-filled account
+          window.google.accounts.id.disableAutoSelect()
+          
+          // Initialize with auto_select disabled to prevent One Tap and auto-fill
           window.google.accounts.id.initialize({
             client_id: clientId,
-            callback: handleCredentialResponse
+            callback: handleCredentialResponse,
+            auto_select: false,
+            cancel_on_tap_outside: true,
+            itp_support: true
           })
 
+          // Render button without any pre-filled account information
           window.google.accounts.id.renderButton(buttonRef.current, {
             theme: 'outline',
-            size: 'large'
+            size: 'large',
+            text: 'signin_with', // Standard sign-in text, not personalized
+            shape: 'rectangular'
           })
           
           setButtonLoading(false)
