@@ -239,7 +239,7 @@ router.put('/:fridgeId/name', async (req: Request, res: Response) => {
     res.json({ 
       message: 'Fridge name updated successfully',
       fridge: {
-        fridgeId: fridge._id.toString(),
+        fridgeId: (fridge._id as mongoose.Types.ObjectId).toString(),
         name: fridge.name,
         members: fridge.members
       }
