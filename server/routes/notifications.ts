@@ -185,24 +185,34 @@ router.post('/check-expiring-items', async (req: Request, res: Response) => {
       const fridge = await mongoose.model('Fridge').findById(item.fridgeId)
       if (!fridge) continue
 
-      // Check if notification already exists for this item
-      const existingNotification = await Notification.findOne({
-        userId: { $in: fridge.members },
-        type: 'item_expiring_tomorrow',
-        'metadata.itemId': (item._id as mongoose.Types.ObjectId).toString(),
-        createdAt: {
-          $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) // Within last 24 hours
-        }
-      })
+      const itemId = (item._id as mongoose.Types.ObjectId).toString()
+      const fridgeId = (item.fridgeId as mongoose.Types.ObjectId).toString()
 
-      if (existingNotification) continue
-
-      // Create notification for each member
+      // Create notification for each member, but only if they don't already have one
       for (const memberId of fridge.members) {
+        // Check if this specific user already has a notification for this item
+        // Check for notifications created today (not just last 24 hours) to avoid duplicates
+        const todayStart = new Date()
+        todayStart.setHours(0, 0, 0, 0)
+        
+        const existingNotification = await Notification.findOne({
+          userId: memberId,
+          type: 'item_expiring_tomorrow',
+          'metadata.itemId': itemId,
+          createdAt: {
+            $gte: todayStart
+          }
+        })
+
+        // Skip if notification already exists for this user today
+        if (existingNotification) {
+          continue
+        }
+
         await createItemExpiringNotification(
           memberId,
-          (item.fridgeId as mongoose.Types.ObjectId).toString(),
-          (item._id as mongoose.Types.ObjectId).toString(),
+          fridgeId,
+          itemId,
           item.name
         )
         notificationsCreated++
