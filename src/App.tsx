@@ -238,10 +238,14 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
 
   // Sync local fridges state when allFridges prop changes
   useEffect(() => {
-    console.log('allFridges prop changed:', allFridges.map(f => ({ id: f.fridgeId, name: f.name })))
+    const propNames = allFridges.map(f => ({ id: f.fridgeId, name: f.name }))
+    console.log('allFridges prop changed:', propNames)
+    console.log('Fridge names in prop:', propNames.map(f => `${f.id}: "${f.name}"`).join(', '))
     // Create new objects to ensure React detects the change
     const newFridges = allFridges.map(f => ({ ...f }))
-    console.log('Setting localFridges to:', newFridges.map(f => ({ id: f.fridgeId, name: f.name })))
+    const localNames = newFridges.map(f => ({ id: f.fridgeId, name: f.name }))
+    console.log('Setting localFridges to:', localNames)
+    console.log('Fridge names being set to local:', localNames.map(f => `${f.id}: "${f.name}"`).join(', '))
     setLocalFridges(newFridges)
   }, [allFridges])
 
@@ -298,7 +302,9 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
               ? { ...f, name: newName }
               : f
           )
-          console.log('Updated localFridges immediately:', updated.map(f => ({ id: f.fridgeId, name: f.name })))
+          const updatedNames = updated.map(f => ({ id: f.fridgeId, name: f.name }))
+        console.log('Updated localFridges immediately:', updatedNames)
+        console.log('Fridge names after immediate update:', updatedNames.map(f => `${f.id}: "${f.name}"`).join(', '))
           return updated
         })
         
@@ -2306,7 +2312,9 @@ function App() {
           members: [...fridge.members],
           createdAt: fridge.createdAt
         }))
-        console.log('Setting allFridges to:', newFridges.map((f: { fridgeId: string; name: string }) => ({ id: f.fridgeId, name: f.name })))
+        const fridgeNames = newFridges.map((f: { fridgeId: string; name: string }) => ({ id: f.fridgeId, name: f.name }))
+        console.log('Setting allFridges to:', fridgeNames)
+        console.log('Fridge names from server:', fridgeNames.map((f: { id: string; name: string }) => `${f.id}: "${f.name}"`).join(', '))
         setAllFridges(newFridges)
         // Set selected fridge to personal fridge if available, otherwise first fridge
         setSelectedFridgeId((current) => {
