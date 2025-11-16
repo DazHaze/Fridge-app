@@ -65,17 +65,31 @@ router.post('/ensure', async (req: Request, res: Response) => {
     let profile = await UserProfile.findOne({ userId })
 
     if (!profile) {
-      const fridge = await Fridge.create({
-        members: [userId],
-        name: name ? formatPersonalFridgeName(name) : undefined
-      })
+      // Check if a fridge already exists for this user (race condition protection)
+      const existingFridge = await Fridge.findOne({ members: userId })
+      
+      if (existingFridge) {
+        // Fridge exists but profile doesn't - create profile with existing fridge
+        profile = await UserProfile.create({
+          userId,
+          email,
+          name,
+          fridgeId: existingFridge._id
+        })
+      } else {
+        // No fridge exists - create both fridge and profile
+        const fridge = await Fridge.create({
+          members: [userId],
+          name: name ? formatPersonalFridgeName(name) : undefined
+        })
 
-      profile = await UserProfile.create({
-        userId,
-        email,
-        name,
-        fridgeId: fridge._id
-      })
+        profile = await UserProfile.create({
+          userId,
+          email,
+          name,
+          fridgeId: fridge._id
+        })
+      }
     } else {
       const updates: Partial<{ email: string; name: string }> = {}
       if (email && email !== profile.email) {

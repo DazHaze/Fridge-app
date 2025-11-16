@@ -119,24 +119,39 @@ router.post('/signup', async (req: Request, res: Response) => {
     const token = user.generateEmailVerificationToken()
     await user.save()
 
-    // Create fridge for user
-    const fridge = await Fridge.create({
-      members: [],
-      name: `${user.name}'s Fridge`
-    })
+    // Create user profile first to check for duplicates
+    const userIdString = (user._id as mongoose.Types.ObjectId).toString()
+    
+    // Check if profile already exists (race condition protection)
+    let profile = await UserProfile.findOne({ userId: userIdString })
+    if (profile) {
+      return res.status(400).json({ message: 'Account already exists. Please sign in instead.' })
+    }
+
+    // Check if a fridge already exists for this user
+    let fridge = await Fridge.findOne({ members: userIdString })
+    
+    if (!fridge) {
+      // Create fridge for user
+      fridge = await Fridge.create({
+        members: [userIdString],
+        name: `${user.name}'s Fridge`
+      })
+    }
 
     // Create user profile
-    const userIdString = (user._id as mongoose.Types.ObjectId).toString()
-    await UserProfile.create({
+    profile = await UserProfile.create({
       userId: userIdString,
       email: normalizedEmail,
       name: user.name,
       fridgeId: fridge._id
     })
 
-    // Add user to fridge
-    fridge.members.push(userIdString)
-    await fridge.save()
+    // Ensure user is in fridge members (in case fridge existed but user wasn't added)
+    if (!fridge.members.includes(userIdString)) {
+      fridge.members.push(userIdString)
+      await fridge.save()
+    }
 
     // Send verification email
     const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
@@ -263,13 +278,18 @@ router.post('/google-signup', async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'This email is already linked to a Google account. Please sign in with Google instead.' })
     }
 
-    // Create personal fridge for user
-    const fridge = await Fridge.create({
-      members: [userId],
-      name: name.trim().toLowerCase().endsWith('s') 
-        ? `${name.trim()}' Fridge` 
-        : `${name.trim()}'s Fridge`
-    })
+    // Check if a fridge already exists for this user (race condition protection)
+    let fridge = await Fridge.findOne({ members: userId })
+    
+    if (!fridge) {
+      // Create personal fridge for user
+      fridge = await Fridge.create({
+        members: [userId],
+        name: name.trim().toLowerCase().endsWith('s') 
+          ? `${name.trim()}' Fridge` 
+          : `${name.trim()}'s Fridge`
+      })
+    }
 
     // Create user profile
     profile = await UserProfile.create({
