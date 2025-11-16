@@ -9,6 +9,7 @@ import InviteUser from './components/InviteUser'
 import AcceptInvite from './components/AcceptInvite'
 import VerifyEmail from './components/VerifyEmail'
 import NotificationSidebar from './components/NotificationSidebar'
+import { Spinner } from '@/components/ui/spinner'
 
 interface FridgeItem {
   _id: string
@@ -947,9 +948,10 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
           }}
         >
           {loading ? (
-            <p style={{ color: 'rgba(0, 0, 0, 0.6)', fontSize: '14px', textAlign: 'center', marginTop: '20px' }}>
-              Loading...
-            </p>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '20px' }}>
+              <Spinner size="sm" />
+              <p style={{ color: 'rgba(0, 0, 0, 0.6)', fontSize: '14px', margin: 0 }}>Loading...</p>
+            </div>
           ) : items.length === 0 ? (
             <p style={{ color: 'rgba(0, 0, 0, 0.6)', fontSize: '14px', textAlign: 'center', marginTop: '20px' }}>
               No items yet. Click + to add.
@@ -1800,7 +1802,12 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
         Clear Fridge
       </button>
     </div>
-
+    build
+Process completed with exit code 2.
+build: server/routes/auth.ts#L143
+Cannot assign to 'profile' because it is a constant.
+build: server/routes/auth.ts#L126
+Cannot redeclare block-scoped variable 'profile'.
       {/* Notification Sidebar */}
       <NotificationSidebar
         isOpen={isNotificationOpen}
@@ -1815,13 +1822,16 @@ function LoadingScreen({ message }: { message: string }) {
     <div
       style={{
         display: 'flex',
+        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
+        gap: '12px',
         minHeight: '100vh',
         backgroundColor: '#f5f5f5'
       }}
     >
-      <p style={{ color: 'rgba(0, 0, 0, 0.6)', fontSize: '16px' }}>{message}</p>
+      <Spinner size="lg" />
+      <p style={{ color: 'rgba(0, 0, 0, 0.6)', fontSize: '16px', margin: 0 }}>{message}</p>
     </div>
   )
 }

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { getApiUrl } from '../config'
+import { Spinner } from '@/components/ui/spinner'
 
 interface InviteUserProps {
   fridgeId: string
@@ -287,11 +288,20 @@ const InviteUser = ({ fridgeId }: InviteUserProps) => {
               letterSpacing: '0.5px',
               boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.2), 0 4px 5px 0 rgba(0, 0, 0, 0.14), 0 1px 10px 0 rgba(0, 0, 0, 0.12)',
               transition: 'all 0.2s ease',
-              opacity: isDisabled ? 0.6 : 1
+              opacity: isDisabled ? 0.6 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px'
             }}
             aria-disabled={isDisabled}
           >
-            {status === 'loading' ? 'Sending...' : status === 'success' ? 'Invite Sent' : 'Send Invite'}
+            {status === 'loading' ? (
+              <>
+                <Spinner size="sm" />
+                Sending...
+              </>
+            ) : status === 'success' ? 'Invite Sent' : 'Send Invite'}
           </button>
         </form>
 
@@ -435,10 +445,19 @@ const InviteUser = ({ fridgeId }: InviteUserProps) => {
                   fontWeight: '500',
                   textTransform: 'uppercase',
                   letterSpacing: '0.5px',
-                  boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.2), 0 4px 5px 0 rgba(0, 0, 0, 0.14), 0 1px 10px 0 rgba(0, 0, 0, 0.12)'
+                  boxShadow: '0 2px 4px -1px rgba(0, 0, 0, 0.2), 0 4px 5px 0 rgba(0, 0, 0, 0.14), 0 1px 10px 0 rgba(0, 0, 0, 0.12)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px'
                 }}
               >
-                {accountInviteLoading ? 'Sending...' : 'Send Account Invite'}
+                {accountInviteLoading ? (
+                  <>
+                    <Spinner size="sm" />
+                    Sending...
+                  </>
+                ) : 'Send Account Invite'}
               </button>
             </div>
           </div>

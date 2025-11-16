@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { getApiUrl } from '../config'
+import { Spinner } from '@/components/ui/spinner'
 
 interface AcceptInviteProps {
   isAuthenticated: boolean
@@ -196,11 +197,18 @@ const AcceptInvite = ({ isAuthenticated, ensureFridge, onAccept }: AcceptInviteP
         <h2 style={{ margin: '0 0 12px', color: 'rgba(0, 0, 0, 0.87)', fontSize: '20px', fontWeight: '500' }}>
           Joining Shared Fridge
         </h2>
-        <p style={{ color: 'rgba(0, 0, 0, 0.6)', fontSize: '14px', margin: '0 0 16px' }}>
-          {status === 'loading'
-            ? 'We are connecting you to the shared fridge. This should only take a moment.'
-            : message}
-        </p>
+        {status === 'loading' ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
+            <Spinner size="lg" />
+            <p style={{ color: 'rgba(0, 0, 0, 0.6)', fontSize: '14px', margin: 0, textAlign: 'center' }}>
+              We are connecting you to the shared fridge. This should only take a moment.
+            </p>
+          </div>
+        ) : (
+          <p style={{ color: 'rgba(0, 0, 0, 0.6)', fontSize: '14px', margin: '0 0 16px' }}>
+            {message}
+          </p>
+        )}
         {status === 'error' && (
           <button
             onClick={acceptInvite}

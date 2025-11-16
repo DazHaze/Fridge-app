@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { getApiUrl } from '../config'
+import { Spinner } from '@/components/ui/spinner'
 
 const VerifyEmail = () => {
   const [searchParams] = useSearchParams()
@@ -76,9 +77,12 @@ const VerifyEmail = () => {
 
         {status === 'loading' && (
           <>
-            <p style={{ color: 'rgba(0, 0, 0, 0.6)', fontSize: '16px', marginBottom: '24px' }}>
-              Verifying your email...
-            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
+              <Spinner size="lg" />
+              <p style={{ color: 'rgba(0, 0, 0, 0.6)', fontSize: '16px', margin: 0 }}>
+                Verifying your email...
+              </p>
+            </div>
           </>
         )}
 

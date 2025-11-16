@@ -131,3 +131,9 @@ button, a {
   min-width: 44px;
 }
 
+/* Spinner animation */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+

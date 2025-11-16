@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { getApiUrl } from '../config'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Spinner } from '@/components/ui/spinner'
 
 declare global {
   interface Window {
@@ -736,10 +737,19 @@ const Login = () => {
                     textTransform: 'uppercase',
                     letterSpacing: '0.5px',
                     boxShadow: signupLoading ? 'none' : '0 2px 4px -1px rgba(0, 0, 0, 0.2), 0 4px 5px 0 rgba(0, 0, 0, 0.14), 0 1px 10px 0 rgba(0, 0, 0, 0.12)',
-                    transition: 'all 0.2s ease'
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
                   }}
                 >
-                  {signupLoading ? 'Creating Account...' : 'Sign Up'}
+                  {signupLoading ? (
+                    <>
+                      <Spinner size="sm" />
+                      Creating Account...
+                    </>
+                  ) : 'Sign Up'}
                 </button>
               </form>
             )}
@@ -842,10 +852,19 @@ const Login = () => {
                 textTransform: 'uppercase',
                 letterSpacing: '0.5px',
                 boxShadow: loginLoading ? 'none' : '0 2px 4px -1px rgba(0, 0, 0, 0.2), 0 4px 5px 0 rgba(0, 0, 0, 0.14), 0 1px 10px 0 rgba(0, 0, 0, 0.12)',
-                transition: 'all 0.2s ease'
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
               }}
             >
-              {loginLoading ? 'Signing In...' : 'Sign In'}
+              {loginLoading ? (
+                <>
+                  <Spinner size="sm" />
+                  Signing In...
+                </>
+              ) : 'Sign In'}
             </button>
           </form>
         )}
@@ -869,9 +888,10 @@ const Login = () => {
           }} 
         />
         {buttonLoading && (
-          <p style={{ color: 'rgba(0, 0, 0, 0.6)', fontSize: '14px', marginTop: '16px', textAlign: 'center' }}>
-            Loading sign-in options...
-          </p>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', marginTop: '16px' }}>
+            <Spinner size="sm" />
+            <p style={{ color: 'rgba(0, 0, 0, 0.6)', fontSize: '14px', margin: 0 }}>Loading sign-in options...</p>
+          </div>
         )}
         {buttonError && (
           <div style={{ marginTop: '16px', padding: '12px', backgroundColor: '#ffebee', borderRadius: '4px' }}>
