@@ -38,6 +38,8 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
   const [isEditingName, setIsEditingName] = useState(false)
   const [nameLoading, setNameLoading] = useState(false)
   const [localFridges, setLocalFridges] = useState(allFridges)
+  const [lastUpdatedFridgeId, setLastUpdatedFridgeId] = useState<string | null>(null)
+  const [renderKey, setRenderKey] = useState(0)
 
   // Format personal fridge name: "[name]'s" or "[name]'" if name ends with 's'
   const formatPersonalFridgeName = (name: string | undefined): string => {
@@ -246,8 +248,18 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
     const localNames = newFridges.map(f => ({ id: f.fridgeId, name: f.name }))
     console.log('Setting localFridges to:', localNames)
     console.log('Fridge names being set to local:', localNames.map(f => `${f.id}: "${f.name}"`).join(', '))
+    
+    // If we just updated a fridge name, ensure we use the latest name from the prop
+    // (which should have the updated name from the server)
     setLocalFridges(newFridges)
-  }, [allFridges])
+    // Force re-render by updating render key
+    setRenderKey(prev => prev + 1)
+    
+    // Clear the last updated fridge ID after a short delay
+    if (lastUpdatedFridgeId) {
+      setTimeout(() => setLastUpdatedFridgeId(null), 1000)
+    }
+  }, [allFridges, lastUpdatedFridgeId])
 
   // Set current fridge name when fridgeId or localFridges changes
   useEffect(() => {
@@ -295,6 +307,9 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
         // Update local state immediately with the new name from response
         setFridgeName(newName)
         
+        // Mark that we just updated this fridge
+        setLastUpdatedFridgeId(fridgeId)
+        
         // Also update localFridges immediately for instant UI update
         setLocalFridges(prev => {
           const updated = prev.map(f => 
@@ -303,8 +318,10 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
               : f
           )
           const updatedNames = updated.map(f => ({ id: f.fridgeId, name: f.name }))
-        console.log('Updated localFridges immediately:', updatedNames)
-        console.log('Fridge names after immediate update:', updatedNames.map(f => `${f.id}: "${f.name}"`).join(', '))
+          console.log('Updated localFridges immediately:', updatedNames)
+          console.log('Fridge names after immediate update:', updatedNames.map(f => `${f.id}: "${f.name}"`).join(', '))
+          // Force re-render
+          setRenderKey(prev => prev + 1)
           return updated
         })
         
@@ -965,7 +982,7 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
       {/* Fridge Tabs */}
       {localFridges.length > 0 && (
         <div
-          key={`fridge-tabs-${localFridges.map(f => `${f.fridgeId}:${f.name || ''}`).join('|')}`}
+          key={`fridge-tabs-${renderKey}-${localFridges.map(f => `${f.fridgeId}:${f.name || ''}`).join('|')}`}
           style={{
             width: '100%',
             maxWidth: '400px',
@@ -986,6 +1003,10 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
           }).map((fridge) => {
             const isActive = fridge.fridgeId === fridgeId
             const displayName = fridge.isPersonal ? formatPersonalFridgeName(user?.name) : (fridge.name || 'Unnamed Fridge')
+            // Log to verify tabs are rendering with correct names
+            if (fridge.fridgeId === fridgeId) {
+              console.log('Rendering tab for current fridge:', { fridgeId: fridge.fridgeId, name: fridge.name, displayName, isPersonal: fridge.isPersonal })
+            }
             return (
               <button
                 key={`${fridge.fridgeId}-${fridge.name || ''}-${fridge.isPersonal}`}
