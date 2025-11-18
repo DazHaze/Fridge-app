@@ -77,6 +77,7 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
   const [newCategoryName, setNewCategoryName] = useState('')
   const [isItemEditOpen, setIsItemEditOpen] = useState(false)
   const [editingItemCategoryId, setEditingItemCategoryId] = useState<string | null>(null)
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
 
   // Capitalize item name (first letter of each word)
   const capitalizeName = (name: string): string => {
@@ -194,6 +195,173 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
     })
     
     return { active, expired }
+  }
+
+  // Group items by category
+  const groupItemsByCategory = (itemsList: FridgeItem[]) => {
+    const grouped: Record<string, FridgeItem[]> = {}
+    const uncategorized: FridgeItem[] = []
+    
+    itemsList.forEach(item => {
+      if (item.categoryId) {
+        if (!grouped[item.categoryId]) {
+          grouped[item.categoryId] = []
+        }
+        grouped[item.categoryId].push(item)
+      } else {
+        uncategorized.push(item)
+      }
+    })
+    
+    return { grouped, uncategorized }
+  }
+
+  // Toggle category expansion
+  const toggleCategory = (categoryId: string) => {
+    setExpandedCategories(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(categoryId)) {
+        newSet.delete(categoryId)
+      } else {
+        newSet.add(categoryId)
+      }
+      return newSet
+    })
+  }
+
+  // Render a single item
+  const renderItem = (item: FridgeItem) => {
+    const priorityColor = getPriorityColor(item)
+    const priorityLabel = getPriorityLabel(item)
+    const displayDate = item.isOpened && item.openedDate 
+      ? new Date(item.openedDate).toLocaleDateString()
+      : new Date(item.expiryDate).toLocaleDateString()
+    const dateLabel = item.isOpened ? 'Opened' : 'Expires'
+    
+    return (
+      <div
+        key={item._id}
+        style={{
+          backgroundColor: '#ffffff',
+          border: `1px solid ${priorityColor}40`,
+          borderLeft: `4px solid ${priorityColor}`,
+          borderRadius: '4px',
+          padding: '12px',
+          color: 'rgba(0, 0, 0, 0.87)',
+          fontSize: '14px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: '12px',
+          width: '100%',
+          position: 'relative',
+          boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.12), 0 1px 2px 0 rgba(0, 0, 0, 0.24)',
+          transition: 'box-shadow 0.2s ease'
+        }}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: '500', marginBottom: '4px', fontSize: '15px', wordBreak: 'break-word', color: 'rgba(0, 0, 0, 0.87)' }}>
+            {capitalizeName(item.name)}
+          </div>
+          <div style={{ fontSize: '12px', color: priorityColor, fontWeight: '500' }}>
+            {priorityLabel} • {dateLabel}: {displayDate}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+          <button
+            onClick={() => handleEditClick(item)}
+            style={{
+              backgroundColor: 'transparent',
+              border: 'none',
+              color: 'rgba(0, 0, 0, 0.54)',
+              cursor: 'pointer',
+              fontSize: '20px',
+              fontWeight: '400',
+              padding: '8px',
+              minWidth: '36px',
+              minHeight: '36px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+              flexShrink: 0,
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+              borderRadius: '50%',
+              lineHeight: '1',
+              letterSpacing: '2px'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.08)'
+              e.currentTarget.style.color = 'rgba(0, 0, 0, 0.87)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent'
+              e.currentTarget.style.color = 'rgba(0, 0, 0, 0.54)'
+            }}
+            onTouchStart={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.08)'
+              e.currentTarget.style.color = 'rgba(0, 0, 0, 0.87)'
+            }}
+            onTouchEnd={(e) => {
+              setTimeout(() => {
+                e.currentTarget.style.backgroundColor = 'transparent'
+                e.currentTarget.style.color = 'rgba(0, 0, 0, 0.54)'
+              }, 150)
+            }}
+            title="Edit item"
+            aria-label="Edit item"
+          >
+            ⋯
+          </button>
+          <button
+            onClick={() => handleDeleteItem(item._id)}
+            style={{
+              backgroundColor: 'transparent',
+              border: 'none',
+              color: '#d32f2f',
+              cursor: 'pointer',
+              fontSize: '24px',
+              fontWeight: '300',
+              padding: '8px',
+              minWidth: '40px',
+              minHeight: '40px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+              flexShrink: 0,
+              touchAction: 'manipulation',
+              WebkitTapHighlightColor: 'transparent',
+              borderRadius: '50%',
+              lineHeight: '1'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(211, 47, 47, 0.12)'
+              e.currentTarget.style.transform = 'scale(1.1)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent'
+              e.currentTarget.style.transform = 'scale(1)'
+            }}
+            onTouchStart={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(211, 47, 47, 0.12)'
+              e.currentTarget.style.transform = 'scale(0.95)'
+            }}
+            onTouchEnd={(e) => {
+              setTimeout(() => {
+                e.currentTarget.style.backgroundColor = 'transparent'
+                e.currentTarget.style.transform = 'scale(1)'
+              }, 150)
+            }}
+            title="Delete item"
+            aria-label="Delete item"
+          >
+            ×
+          </button>
+        </div>
+      </div>
+    )
   }
 
   const fetchItems = useCallback(async () => {
@@ -1782,145 +1950,120 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
               <Spinner size="sm" />
               <p style={{ color: 'rgba(0, 0, 0, 0.6)', fontSize: '14px', margin: 0 }}>Loading...</p>
             </div>
-          ) : items.length === 0 ? (
+          ) : items.length === 0 && categories.length === 0 ? (
             <p style={{ color: 'rgba(0, 0, 0, 0.6)', fontSize: '14px', textAlign: 'center', marginTop: '20px' }}>
               No items yet. Click + to add.
             </p>
-          ) : (
-            items.map((item) => {
-              const priorityColor = getPriorityColor(item)
-              const priorityLabel = getPriorityLabel(item)
-              const displayDate = item.isOpened && item.openedDate 
-                ? new Date(item.openedDate).toLocaleDateString()
-                : new Date(item.expiryDate).toLocaleDateString()
-              const dateLabel = item.isOpened ? 'Opened' : 'Expires'
-              
-              return (
-              <div
-                key={item._id}
-                style={{
-                  backgroundColor: '#ffffff',
-                  border: `1px solid ${priorityColor}40`,
-                  borderLeft: `4px solid ${priorityColor}`,
-                  borderRadius: '4px',
-                  padding: '12px',
-                  color: 'rgba(0, 0, 0, 0.87)',
-                  fontSize: '14px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'flex-start',
-                  gap: '12px',
-                  width: '100%',
-                  position: 'relative',
-                  boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.12), 0 1px 2px 0 rgba(0, 0, 0, 0.24)',
-                  transition: 'box-shadow 0.2s ease'
-                }}
-              >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: '500', marginBottom: '4px', fontSize: '15px', wordBreak: 'break-word', color: 'rgba(0, 0, 0, 0.87)' }}>
-                    {capitalizeName(item.name)}
-                  </div>
-                  <div style={{ fontSize: '12px', color: priorityColor, fontWeight: '500' }}>
-                    {priorityLabel} • {dateLabel}: {displayDate}
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                  <button
-                    onClick={() => handleEditClick(item)}
-                    style={{
-                      backgroundColor: 'transparent',
-                      border: 'none',
-                      color: 'rgba(0, 0, 0, 0.54)',
-                      cursor: 'pointer',
-                      fontSize: '20px',
-                      fontWeight: '400',
-                      padding: '8px',
-                      minWidth: '36px',
-                      minHeight: '36px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                      flexShrink: 0,
-                      touchAction: 'manipulation',
-                      WebkitTapHighlightColor: 'transparent',
-                      borderRadius: '50%',
-                      lineHeight: '1',
-                      letterSpacing: '2px'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.08)'
-                      e.currentTarget.style.color = 'rgba(0, 0, 0, 0.87)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent'
-                      e.currentTarget.style.color = 'rgba(0, 0, 0, 0.54)'
-                    }}
-                    onTouchStart={(e) => {
-                      e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.08)'
-                      e.currentTarget.style.color = 'rgba(0, 0, 0, 0.87)'
-                    }}
-                    onTouchEnd={(e) => {
-                      setTimeout(() => {
-                        e.currentTarget.style.backgroundColor = 'transparent'
-                        e.currentTarget.style.color = 'rgba(0, 0, 0, 0.54)'
-                      }, 150)
-                    }}
-                    title="Edit item"
-                    aria-label="Edit item"
-                  >
-                    ⋯
-                  </button>
-                  <button
-                    onClick={() => handleDeleteItem(item._id)}
-                    style={{
-                      backgroundColor: 'transparent',
-                      border: 'none',
-                      color: '#d32f2f',
-                      cursor: 'pointer',
-                      fontSize: '24px',
-                      fontWeight: '300',
-                      padding: '8px',
-                      minWidth: '40px',
-                      minHeight: '40px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                      flexShrink: 0,
-                      touchAction: 'manipulation',
-                      WebkitTapHighlightColor: 'transparent',
-                      borderRadius: '50%',
-                      lineHeight: '1'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = 'rgba(211, 47, 47, 0.12)'
-                      e.currentTarget.style.transform = 'scale(1.1)'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = 'transparent'
-                      e.currentTarget.style.transform = 'scale(1)'
-                    }}
-                    onTouchStart={(e) => {
-                      e.currentTarget.style.backgroundColor = 'rgba(211, 47, 47, 0.12)'
-                      e.currentTarget.style.transform = 'scale(0.95)'
-                    }}
-                    onTouchEnd={(e) => {
-                      setTimeout(() => {
-                        e.currentTarget.style.backgroundColor = 'transparent'
-                        e.currentTarget.style.transform = 'scale(1)'
-                      }, 150)
-                    }}
-                    title="Delete item"
-                    aria-label="Delete item"
-                  >
-                    ×
-                  </button>
-                </div>
-              </div>
+          ) : (() => {
+            const { grouped, uncategorized } = groupItemsByCategory(items)
+            // Show all categories, sorted by name
+            const sortedCategories = [...categories].sort((a, b) => a.name.localeCompare(b.name))
+            
+            return (
+              <>
+                {/* Render categories with their items */}
+                {sortedCategories.map((category) => {
+                  const categoryItems = grouped[category._id] || []
+                  const isExpanded = expandedCategories.has(category._id)
+                  
+                  return (
+                    <div key={category._id} style={{ width: '100%' }}>
+                      {/* Category header */}
+                      <button
+                        onClick={() => toggleCategory(category._id)}
+                        style={{
+                          width: '100%',
+                          backgroundColor: '#ffffff',
+                          border: '1px solid rgba(0, 0, 0, 0.12)',
+                          borderRadius: '4px',
+                          padding: '6px 12px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          cursor: 'pointer',
+                          marginBottom: '4px',
+                          transition: 'background-color 0.2s ease',
+                          minHeight: '28px'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.04)'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = '#ffffff'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                            style={{
+                              transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                              transition: 'transform 0.2s ease'
+                            }}
+                          >
+                            <path
+                              d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"
+                              fill="rgba(0, 0, 0, 0.54)"
+                            />
+                          </svg>
+                          <span style={{ 
+                            fontWeight: '500', 
+                            fontSize: '14px', 
+                            color: 'rgba(0, 0, 0, 0.87)',
+                            flex: 1,
+                            textAlign: 'left'
+                          }}>
+                            {category.name}
+                          </span>
+                          <div
+                            style={{
+                              backgroundColor: '#6200ee',
+                              color: '#ffffff',
+                              borderRadius: '50%',
+                              width: '20px',
+                              height: '20px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '12px',
+                              fontWeight: '500',
+                              minWidth: '20px'
+                            }}
+                          >
+                            {categoryItems.length}
+                          </div>
+                        </div>
+                      </button>
+                      
+                      {/* Category items (collapsible) */}
+                      {isExpanded && (
+                        <div style={{ marginLeft: '8px', marginBottom: '8px' }}>
+                          {categoryItems.map(item => renderItem(item))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+                
+                {/* Render uncategorized items */}
+                {uncategorized.length > 0 && (
+                  <>
+                    {sortedCategories.length > 0 && (
+                      <div style={{ 
+                        height: '1px', 
+                        backgroundColor: 'rgba(0, 0, 0, 0.12)', 
+                        margin: '8px 0' 
+                      }} />
+                    )}
+                    {uncategorized.map(item => renderItem(item))}
+                  </>
+                )}
+              </>
             )
-            })
-          )}
+          })()}
         </div>
 
         <button
