@@ -107,13 +107,14 @@ router.post('/', async (req: Request, res: Response) => {
   }
 
   try {
-    const { name, expiryDate, userId, fridgeId: fridgeIdInput, isOpened, openedDate } = req.body as {
+    const { name, expiryDate, userId, fridgeId: fridgeIdInput, isOpened, openedDate, categoryId } = req.body as {
       name?: string
       expiryDate?: string
       userId?: string
       fridgeId?: string
       isOpened?: boolean
       openedDate?: string
+      categoryId?: string
     }
 
     if (!name || !expiryDate || (!userId && !fridgeIdInput)) {
@@ -220,13 +221,14 @@ router.put('/:id', async (req: Request, res: Response) => {
 
   try {
     const { id } = req.params
-    const { name, expiryDate, userId, fridgeId: fridgeIdInput, isOpened, openedDate } = req.body as {
+    const { name, expiryDate, userId, fridgeId: fridgeIdInput, isOpened, openedDate, categoryId } = req.body as {
       name?: string
       expiryDate?: string
       userId?: string
       fridgeId?: string
       isOpened?: boolean
       openedDate?: string
+      categoryId?: string
     }
 
     if (!name || !expiryDate || (!userId && !fridgeIdInput)) {
