@@ -18,7 +18,17 @@ interface FridgeItem {
   expiryDate: string
   isOpened?: boolean
   openedDate?: string
+  categoryId?: string
   createdAt?: string
+}
+
+interface Category {
+  _id: string
+  name: string
+  fridgeId: string
+  color?: string
+  createdAt?: string
+  updatedAt?: string
 }
 
 interface FridgeAppProps {
@@ -62,6 +72,11 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
   const [deletedCount, setDeletedCount] = useState(0)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
+  const [categories, setCategories] = useState<Category[]>([])
+  const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [isItemEditOpen, setIsItemEditOpen] = useState(false)
+  const [editingItemCategoryId, setEditingItemCategoryId] = useState<string | null>(null)
 
   // Capitalize item name (first letter of each word)
   const capitalizeName = (name: string): string => {
@@ -217,10 +232,58 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
     }
   }, [userId, fridgeId])
 
+  const fetchCategories = useCallback(async () => {
+    if (!userId || !fridgeId) return
+    
+    try {
+      const params = new URLSearchParams({
+        fridgeId: fridgeId,
+        userId: userId
+      })
+      const response = await fetch(getApiUrl(`categories?${params.toString()}`))
+      if (response.ok) {
+        const data = await response.json()
+        setCategories(data)
+      }
+    } catch (error) {
+      console.error('Error fetching categories:', error)
+    }
+  }, [userId, fridgeId])
+
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim() || !userId || !fridgeId) return
+    
+    try {
+      const response = await fetch(getApiUrl('categories'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newCategoryName.trim(),
+          fridgeId,
+          userId
+        })
+      })
+      
+      if (response.ok) {
+        const newCategory = await response.json()
+        setCategories([...categories, newCategory])
+        setNewCategoryName('')
+        setIsCategoryDialogOpen(false)
+      } else {
+        const error = await response.json()
+        alert(error.message || 'Failed to create category')
+      }
+    } catch (error) {
+      console.error('Error creating category:', error)
+      alert('Failed to create category')
+    }
+  }
+
   // Fetch items from API on component mount and when userId or fridgeId changes
   useEffect(() => {
     if (userId && fridgeId) {
       // Clear items when switching fridges to avoid showing stale data
+      fetchCategories()
       setItems([])
       setBinItems([])
       fetchItems()
@@ -361,19 +424,12 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
   }
 
   const handleEditClick = (item: FridgeItem) => {
-    // Verify item still exists in current state
-    const itemExists = [...items, ...binItems].some(i => i._id === item._id)
-    if (!itemExists) {
-      alert('This item no longer exists. Refreshing the list...')
-      fetchItems()
-      return
-    }
-    
     setEditingItemId(item._id)
     setItemName(item.name)
-    setExpiryDate(item.expiryDate.split('T')[0]) // Format date for input
+    setExpiryDate(new Date(item.expiryDate).toISOString().split('T')[0])
     setIsOpened(item.isOpened || false)
-    setIsEditFormOpen(true)
+    setEditingItemCategoryId(item.categoryId || null)
+    setIsItemEditOpen(true)
   }
 
   const handleCloseEditForm = () => {
@@ -416,7 +472,8 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
         expiryDate: expiryDate,
         userId: userId,
         fridgeId: fridgeId,
-        isOpened: isOpened
+        isOpened: isOpened,
+        categoryId: editingItemCategoryId || null
       }
       
       // If opening the item, set openedDate to today
@@ -453,7 +510,12 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
         setItems(items.map(item => item._id === editingItemId ? updatedItem : item))
         setBinItems(binItems.map(item => item._id === editingItemId ? updatedItem : item))
         
-        handleCloseEditForm()
+        setIsItemEditOpen(false)
+        setEditingItemId(null)
+        setItemName('')
+        setExpiryDate('')
+        setIsOpened(false)
+        setEditingItemCategoryId(null)
         // Refresh items to ensure correct separation
         fetchItems()
       } else {
@@ -1130,6 +1192,56 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
           </button>
         </div>
 
+        {/* Category button below heading */}
+        <div
+          style={{
+            width: '100%',
+            display: 'flex',
+            justifyContent: 'flex-end',
+            marginBottom: '12px'
+          }}
+        >
+          <button
+            onClick={() => setIsCategoryDialogOpen(true)}
+            style={{
+              padding: '8px 16px',
+              backgroundColor: 'transparent',
+              color: '#6200ee',
+              border: '1px solid rgba(98, 0, 238, 0.5)',
+              borderRadius: '4px',
+              fontSize: '14px',
+              fontWeight: '500',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.backgroundColor = 'rgba(98, 0, 238, 0.08)'
+              e.currentTarget.style.borderColor = '#6200ee'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.backgroundColor = 'transparent'
+              e.currentTarget.style.borderColor = 'rgba(98, 0, 238, 0.5)'
+            }}
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"
+                fill="currentColor"
+              />
+            </svg>
+            Add Category
+          </button>
+        </div>
+
         {/* Settings Sheet */}
         {isSettingsOpen && (
           <Sheet open={isSettingsOpen} onOpenChange={setIsSettingsOpen} side="right">
@@ -1393,6 +1505,265 @@ function FridgeApp({ fridgeId, allFridges, onFridgeChange, onRefreshFridges }: F
             </div>
           </SheetContent>
         </Sheet>
+        )}
+
+        {/* Item Edit Sheet */}
+        {isItemEditOpen && (
+          <Sheet open={isItemEditOpen} onOpenChange={setIsItemEditOpen} side="right">
+            <SheetContent>
+              <SheetHeader onClose={() => {
+                setIsItemEditOpen(false)
+                setEditingItemId(null)
+                setItemName('')
+                setExpiryDate('')
+                setIsOpened(false)
+                setEditingItemCategoryId(null)
+              }}>
+                <SheetTitle>Edit Item</SheetTitle>
+                <SheetDescription>Update item details</SheetDescription>
+              </SheetHeader>
+              <div
+                style={{
+                  padding: '24px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '20px'
+                }}
+              >
+                <div>
+                  <label
+                    htmlFor="editItemNameSheet"
+                    style={{
+                      display: 'block',
+                      marginBottom: '8px',
+                      color: 'rgba(0, 0, 0, 0.87)',
+                      fontWeight: '500',
+                      fontSize: '14px'
+                    }}
+                  >
+                    Item Name
+                  </label>
+                  <input
+                    type="text"
+                    id="editItemNameSheet"
+                    value={itemName}
+                    onChange={(e) => setItemName(e.target.value)}
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      border: '1px solid rgba(0, 0, 0, 0.23)',
+                      borderRadius: '4px',
+                      fontSize: '16px',
+                      boxSizing: 'border-box',
+                      outline: 'none'
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#6200ee'
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.23)'
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="editItemCategorySheet"
+                    style={{
+                      display: 'block',
+                      marginBottom: '8px',
+                      color: 'rgba(0, 0, 0, 0.87)',
+                      fontWeight: '500',
+                      fontSize: '14px'
+                    }}
+                  >
+                    Category
+                  </label>
+                  <select
+                    id="editItemCategorySheet"
+                    value={editingItemCategoryId || ''}
+                    onChange={(e) => setEditingItemCategoryId(e.target.value || null)}
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      border: '1px solid rgba(0, 0, 0, 0.23)',
+                      borderRadius: '4px',
+                      fontSize: '16px',
+                      boxSizing: 'border-box',
+                      backgroundColor: '#ffffff',
+                      outline: 'none',
+                      cursor: 'pointer'
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#6200ee'
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.23)'
+                    }}
+                  >
+                    <option value="">No Category</option>
+                    {categories.map((cat) => (
+                      <option key={cat._id} value={cat._id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsItemEditOpen(false)
+                      setEditingItemId(null)
+                      setItemName('')
+                      setExpiryDate('')
+                      setIsOpened(false)
+                      setEditingItemCategoryId(null)
+                    }}
+                    style={{
+                      padding: '10px 16px',
+                      backgroundColor: 'transparent',
+                      color: '#6200ee',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '500'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      handleUpdateItem(e as any)
+                    }}
+                    style={{
+                      padding: '10px 16px',
+                      backgroundColor: '#6200ee',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '500'
+                    }}
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            </SheetContent>
+          </Sheet>
+        )}
+
+        {/* Category Dialog */}
+        {isCategoryDialogOpen && (
+          <Sheet open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen} side="right">
+            <SheetContent>
+              <SheetHeader onClose={() => {
+                setIsCategoryDialogOpen(false)
+                setNewCategoryName('')
+              }}>
+                <SheetTitle>Add Category</SheetTitle>
+                <SheetDescription>Create a new category for organizing items</SheetDescription>
+              </SheetHeader>
+              <div
+                style={{
+                  padding: '24px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '20px'
+                }}
+              >
+                <div>
+                  <label
+                    htmlFor="categoryName"
+                    style={{
+                      display: 'block',
+                      marginBottom: '8px',
+                      color: 'rgba(0, 0, 0, 0.87)',
+                      fontWeight: '500',
+                      fontSize: '14px'
+                    }}
+                  >
+                    Category Name
+                  </label>
+                  <input
+                    type="text"
+                    id="categoryName"
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    placeholder="e.g., Vegetables, Dairy, Meat"
+                    required
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      border: '1px solid rgba(0, 0, 0, 0.23)',
+                      borderRadius: '4px',
+                      fontSize: '16px',
+                      boxSizing: 'border-box',
+                      outline: 'none'
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = '#6200ee'
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.23)'
+                    }}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        handleCreateCategory()
+                      }
+                    }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCategoryDialogOpen(false)
+                      setNewCategoryName('')
+                    }}
+                    style={{
+                      padding: '10px 16px',
+                      backgroundColor: 'transparent',
+                      color: '#6200ee',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '500'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCreateCategory}
+                    disabled={!newCategoryName.trim()}
+                    style={{
+                      padding: '10px 16px',
+                      backgroundColor: !newCategoryName.trim() ? 'rgba(0, 0, 0, 0.12)' : '#6200ee',
+                      color: !newCategoryName.trim() ? 'rgba(0, 0, 0, 0.26)' : '#ffffff',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: !newCategoryName.trim() ? 'not-allowed' : 'pointer',
+                      fontSize: '14px',
+                      fontWeight: '500'
+                    }}
+                  >
+                    Create
+                  </button>
+                </div>
+              </div>
+            </SheetContent>
+          </Sheet>
         )}
         
         <div

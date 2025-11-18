@@ -144,7 +144,8 @@ router.post('/', async (req: Request, res: Response) => {
       userId: userId || fridgeId,
       fridgeId,
       isOpened: isOpened || false,
-      openedDate: isOpened && openedDate ? new Date(openedDate) : null
+      openedDate: isOpened && openedDate ? new Date(openedDate) : null,
+      categoryId: categoryId || null
     })
 
     const savedItem = await newItem.save()
@@ -262,6 +263,7 @@ router.put('/:id', async (req: Request, res: Response) => {
     }
 
     updateData.openedDate = isOpened && openedDate ? new Date(openedDate) : null
+    updateData.categoryId = categoryId || null
 
     const updatedItem = await FridgeItem.findOneAndUpdate(
       { _id: id, fridgeId },

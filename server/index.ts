@@ -7,6 +7,7 @@ import fridgeRoutes from './routes/fridges.js'
 import inviteRoutes from './routes/invites.js'
 import authRoutes from './routes/auth.js'
 import notificationRoutes from './routes/notifications.js'
+import categoryRoutes from './routes/categories.js'
 
 dotenv.config()
 
@@ -77,6 +78,7 @@ app.use('/api/fridges', fridgeRoutes)
 app.use('/api/invites', inviteRoutes)
 app.use('/api/auth', authRoutes)
 app.use('/api/notifications', notificationRoutes)
+app.use('/api/categories', categoryRoutes)
 
 // MongoDB connection
 const connectDB = async () => {

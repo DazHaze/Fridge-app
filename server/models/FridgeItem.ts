@@ -7,6 +7,7 @@ export interface IFridgeItem extends Document {
   fridgeId: mongoose.Types.ObjectId | string
   isOpened: boolean
   openedDate?: Date
+  categoryId?: mongoose.Types.ObjectId | string
   createdAt: Date
 }
 
@@ -39,6 +40,11 @@ const FridgeItemSchema: Schema = new Schema({
   },
   openedDate: {
     type: Date,
+    default: null
+  },
+  categoryId: {
+    type: Schema.Types.ObjectId,
+    ref: 'Category',
     default: null
   },
   createdAt: {
